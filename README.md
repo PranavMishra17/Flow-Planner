@@ -1,24 +1,25 @@
 # Flow Planner
 
-An AI-powered multi-agent system that automatically captures, documents, and visualizes step-by-step UI workflows for any web application. Powered by Gemini planning, Playwright automation, and Claude vision validation.
+An AI-powered autonomous system that captures and documents step-by-step UI workflows for any web application. Powered by Browser-Use framework with Claude Sonnet 4.5 vision and Gemini planning.
 
 ## Features
 
-- **AI Planning**: Uses Google Gemini with web search grounding to research tasks and create execution plans
-- **Browser Automation**: Playwright-based execution with fallback selectors for robustness
-- **Visual Validation**: Claude Vision validates each step by analyzing screenshots
-- **Comprehensive Logging**: Detailed logs for debugging and monitoring
-- **Error Recovery**: Graceful error handling with alternative selectors and retry logic
+- **Autonomous Navigation**: Browser-Use agent navigates UIs without pre-programmed selectors
+- **Smart Planning**: Gemini detects authentication requirements and creates workflow outlines
+- **Vision + DOM**: Claude Sonnet 4.5 combines visual and structural understanding
+- **Persistent Auth**: Saved browser profiles for seamless authentication
+- **State Capture**: Automatic screenshot and metadata extraction
 
-## Day 1 Status: COMPLETE
+## System Architecture
 
-Core agent components implemented and ready for testing:
-- [config.py](config.py) - Configuration management
-- [utils/logger.py](utils/logger.py) - Logging setup
-- [agent/planner.py](agent/planner.py) - Gemini-based workflow planner
-- [agent/executor.py](agent/executor.py) - Playwright automation executor
-- [agent/validator.py](agent/validator.py) - Claude Vision validator
-- [test_agent.py](test_agent.py) - Test script for complete pipeline
+```
+Gemini Planner → Browser-Use Agent → State Capturer
+     ↓                  ↓                  ↓
+Auth detection    Autonomous        Screenshots +
++ workflow        navigation        Metadata
+```
+
+**Browser-Use Framework**: Uses perception-cognition-action loop for dynamic UI adaptation
 
 ## Setup
 
@@ -29,12 +30,12 @@ Core agent components implemented and ready for testing:
 python -m venv venv
 
 # Activate virtual environment
-# On Windows:
+# Windows:
 venv\Scripts\activate
-# On macOS/Linux:
+# macOS/Linux:
 source venv/bin/activate
 
-# Install Python packages
+# Install packages
 pip install -r requirements.txt
 
 # Install Playwright browser
@@ -43,84 +44,90 @@ playwright install chromium
 
 ### 2. Configure Environment
 
-Copy the `.env-template` file to `.env` and add your API keys:
+Copy `.env-template` to `.env` and add your API keys:
 
 ```bash
 # API Keys
 GEMINI_API_KEY=your-gemini-key-here
 ANTHROPIC_API_KEY=your-anthropic-key-here
 
-# Flask Configuration
-FLASK_SECRET_KEY=generate-random-secret-key-here
-FLASK_ENV=development
+# Browser-Use Settings
+BROWSER_USE_MAX_STEPS=50
+BROWSER_USE_LLM_MODEL=claude-sonnet-4-5-20250929
 
-# Application Settings
-ENABLE_VALIDATION=true
+# Authentication (optional - for Tier 2 auto-login)
+DEFAULT_EMAIL=your.email@example.com
+DEFAULT_PASSWORD=your_password
+
+# Browser Settings
 HEADLESS_BROWSER=false
-MAX_CONCURRENT_JOBS=3
+USE_PERSISTENT_CONTEXT=true
 ```
 
 **Get API Keys:**
 - **Gemini**: https://aistudio.google.com/app/apikey (Free)
 - **Anthropic**: https://console.anthropic.com/ ($5 free credit)
 
-### 3. Test Your Setup
-
-First, verify your API keys work:
+### 3. Verify Setup
 
 ```bash
-python test_keys.py
+python verify_setup.py
 ```
 
-You should see:
-```
-[SUCCESS] Gemini: Gemini works
-[SUCCESS] Claude: Claude works
-```
+You should see all checks pass with `[OK] PASSED` status.
 
-## Testing Day 1 Components
+## Usage
 
-### Interactive Mode
+### Quick Start - Predefined Tasks
 
-Run the test script and enter your own test case:
+Run workflow capture with predefined test cases:
 
 ```bash
-python test_agent.py
+python run_workflow.py --predefined
 ```
 
-You'll be prompted to enter:
-- Task description (e.g., "Navigate to the homepage")
-- Application URL (e.g., "https://example.com")
-- Application name (e.g., "Example Website")
+This will test:
+- Wikipedia search
+- YouTube homepage
+- Google search
+- GitHub browsing
 
-### Predefined Tests
+### Custom Workflow
 
-Run the included test cases:
+Run interactive mode to capture your own workflow:
 
 ```bash
-python test_agent.py --predefined
+python run_workflow.py
 ```
 
-### What Happens During a Test
+You'll be prompted for:
+- Task description (e.g., "Search for Python tutorials")
+- Application URL (e.g., "https://www.google.com")
+- Application name (e.g., "Google")
 
-1. **Planning Phase**: Gemini researches the task and creates an execution plan
-2. **Execution Phase**: Playwright executes each step and captures screenshots
-3. **Validation Phase**: Claude analyzes screenshots to verify success
-4. **Results**: A JSON file is saved with complete workflow data
+### Comprehensive Testing
 
-### Expected Output
+Run the full test suite:
+
+```bash
+python test_browser_use.py
+```
+
+Tests include:
+1. Simple navigation (no auth)
+2. Planner auth detection (3 test cases)
+
+## Output Structure
+
+Each workflow capture creates:
 
 ```
-[PLANNER] Creating plan for task: Navigate to the homepage
-[PLANNER] Plan created successfully with 2 steps
-[EXECUTOR] Starting execution of 2 steps
-[EXECUTOR] Step 1 completed successfully
-[EXECUTOR] Step 2 completed successfully
-[VALIDATOR] Validating 2 steps
-[VALIDATOR] Validation complete: 2/2 steps valid
-
-Screenshots saved to: static/screenshots/test_YYYYMMDD_HHMMSS/
-Results saved to: test_results_test_YYYYMMDD_HHMMSS.json
+output/
+└── {task_name}_{timestamp}/
+    ├── metadata.json          # Workflow data
+    ├── screenshot_001.png     # State screenshots
+    ├── screenshot_002.png
+    └── ...
 ```
 
 ## Project Structure
@@ -128,60 +135,94 @@ Results saved to: test_results_test_YYYYMMDD_HHMMSS.json
 ```
 Flow-Planner/
 ├── agent/
-│   ├── planner.py       # Gemini workflow planner
-│   ├── executor.py      # Playwright automation
-│   └── validator.py     # Claude Vision validator
+│   ├── planner.py              # Gemini workflow planner
+│   ├── browser_use_agent.py    # Browser-Use wrapper
+│   ├── state_capturer.py       # State extraction
+│   └── authenticator.py        # 3-tier auth handler
 ├── utils/
-│   └── logger.py        # Logging configuration
-├── static/
-│   └── screenshots/     # Captured screenshots
-├── logs/                # Application logs
-├── config.py            # Configuration management
-├── test_agent.py        # Test script
-└── requirements.txt     # Python dependencies
+│   └── logger.py               # Logging configuration
+├── output/                     # Captured workflows
+├── logs/                       # Application logs
+├── config.py                   # Configuration management
+├── run_workflow.py             # Quick workflow capture
+├── test_browser_use.py         # Comprehensive test suite
+├── verify_setup.py             # Setup verification
+└── requirements.txt            # Dependencies
 ```
 
-## Validation Criteria - Day 1
+## How It Works
 
-- [x] Gemini generates valid execution plans
-- [x] Playwright captures screenshots
-- [x] Claude validates screenshots
-- [x] All components log comprehensively
-- [x] Errors are handled gracefully
-- [x] Can run Python script that captures workflow
+### 1. Planning Phase
+- Gemini analyzes the task
+- Detects authentication requirements
+- Creates high-level workflow outline
+
+### 2. Execution Phase
+- Browser-Use agent navigates autonomously
+- Claude Sonnet 4.5 analyzes screenshots + DOM
+- Adapts to dynamic content in real-time
+- No CSS selectors needed
+
+### 3. Capture Phase
+- Extracts screenshots from execution history
+- Saves structured metadata
+- Organizes output by task
+
+## Authentication
+
+**3-Tier Strategy:**
+
+1. **Tier 1**: Persistent browser profile (automatic)
+   - Saved cookies and sessions
+   - No manual login required for returning users
+
+2. **Tier 2**: Browser-Use auto-login (optional)
+   - Uses DEFAULT_EMAIL and DEFAULT_PASSWORD from .env
+   - Agent automatically handles login forms
+
+3. **Tier 3**: Manual login (fallback)
+   - Pauses for user to login manually
+   - Configurable timeout
+
+## Cost Estimate
+
+Per workflow (typical 5-10 steps):
+- Gemini Flash: $0.00 (Free tier)
+- Browser-Use: $0.00 (Open source)
+- Claude Sonnet 4.5: ~$0.02-0.05
+- **Total**: ~$0.02-0.05 per workflow
 
 ## Troubleshooting
 
-### "Configuration error: GEMINI_API_KEY is not set"
-- Make sure you copied `.env-template` to `.env`
-- Add your API keys to the `.env` file
+### "Configuration error: ANTHROPIC_API_KEY is not set"
+- Copy `.env-template` to `.env`
+- Add your API keys
 
-### "Failed to launch browser"
+### "Browser launch failed"
 - Run `playwright install chromium`
-- Check that you have sufficient disk space
+- Check disk space
 
-### "API call failed"
-- Verify your API keys are correct
-- Check your internet connection
-- Review rate limits (Gemini: 60 req/min free tier)
+### "'ChatAnthropic' object has no attribute 'model_name'"
+- This is fixed in the latest version
+- Ensure you're using the updated browser_use_agent.py
 
-### Browser opens but nothing happens
-- Check the logs in `logs/app.log` for detailed error messages
-- Try setting `HEADLESS_BROWSER=false` to see what's happening
+### Agent execution fails
+- Check logs in `logs/app.log`
+- Set `HEADLESS_BROWSER=false` to see browser
+- Verify API keys are valid
 
-## Next Steps
+## Documentation
 
-- **Day 2**: Database & Storage Layer (SQLite + file storage)
-- **Day 3**: Flask API & Job Queue (REST endpoints + background workers)
-- **Day 4**: WebSocket Real-Time Updates (Live progress)
-- **Day 5**: Frontend UI (Web interface)
+- [SYSTEM_OVERVIEW.md](SYSTEM_OVERVIEW.md) - Architecture and data flow
+- [IMPLEMENTATION_SUCCESS.md](IMPLEMENTATION_SUCCESS.md) - Implementation details
+- [BROWSER_USE_IMPLEMENTATION.md](BROWSER_USE_IMPLEMENTATION.md) - Usage guide
+- [CLEANUP_SUMMARY.md](CLEANUP_SUMMARY.md) - Recent cleanup changes
 
-## Cost Estimate Per Workflow
+## Test Status
 
-- Gemini Flash: $0.00 (Free tier)
-- Playwright: $0.00 (Open source)
-- Claude Vision (~6 steps): ~$0.018
-- **Total**: ~$0.02 per workflow
+- [OK] Simple Navigation Test
+- [OK] Planner Auth Detection (3/3 cases)
+- [READY] Authentication Flow Test
 
 ## License
 

@@ -50,6 +50,8 @@ class Config:
     GOOGLE_ACCOUNT_EMAIL = os.getenv('GOOGLE_ACCOUNT_EMAIL', '')  # For OAuth detection
     AUTH_TIMEOUT = int(os.getenv('AUTH_TIMEOUT', '30000'))  # milliseconds - manual login timeout
     OAUTH_REDIRECT_TIMEOUT = int(os.getenv('OAUTH_REDIRECT_TIMEOUT', '15000'))  # milliseconds - OAuth redirect timeout
+    DEFAULT_EMAIL = os.getenv('DEFAULT_EMAIL', '')  # Default email for Tier 2 auto-login
+    DEFAULT_PASSWORD = os.getenv('DEFAULT_PASSWORD', '')  # Default password for Tier 2 auto-login
 
     # AI Model Settings
     GEMINI_MODEL = 'models/gemini-flash-lite-latest'
@@ -63,6 +65,10 @@ class Config:
     MAX_STEPS = 15
     SCREENSHOT_QUALITY = 80
     STEP_WAIT_TIME = 2000  # milliseconds between steps
+
+    # Browser-Use Settings
+    BROWSER_USE_MAX_STEPS = int(os.getenv('BROWSER_USE_MAX_STEPS', '50'))  # Max steps for Browser-Use agent
+    BROWSER_USE_LLM_MODEL = os.getenv('BROWSER_USE_LLM_MODEL', 'claude-sonnet-4-5-20250929')  # LLM model for Browser-Use agent
 
     # Vision Loop Settings
     MAX_ACTIONS_PER_STEP = 10  # Prevent infinite loops within a step

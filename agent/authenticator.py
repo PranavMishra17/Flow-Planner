@@ -228,8 +228,103 @@ class AuthenticationHandler:
                     logger.debug(f"[AUTH] Selector {selector} failed: {str(e)}")
                     continue
 
+        # OAuth button detection failed, try auto-login with credentials
+        if Config.DEFAULT_EMAIL and Config.DEFAULT_PASSWORD:
+            logger.info("[AUTH] OAuth detection failed, attempting auto-login with credentials")
+            return await self._try_auto_login(page, app_name)
+
         logger.info(f"[AUTH] No OAuth providers found or authentication failed")
         return False
+
+    async def _try_auto_login(self, page: Page, app_name: str) -> bool:
+        """
+        Attempt to automatically log in using Browser-Use agent with credentials.
+
+        Args:
+            page: Playwright Page object
+            app_name: Name of the application
+
+        Returns:
+            True if auto-login successful, False otherwise
+        """
+        logger.info("[AUTH] ==================== AUTO-LOGIN WITH BROWSER-USE ====================")
+        logger.info(f"[AUTH] Attempting automatic login for {app_name}")
+        logger.info(f"[AUTH] Using email: {Config.DEFAULT_EMAIL}")
+
+        try:
+            from browser_use import Agent, Browser
+            from langchain_anthropic import ChatAnthropic
+
+            # Create login task for Browser-Use agent
+            login_task = f"""
+Log in to {app_name} using the following credentials:
+Email: {Config.DEFAULT_EMAIL}
+Password: {Config.DEFAULT_PASSWORD}
+
+Steps:
+1. Find the email/username input field and enter: {Config.DEFAULT_EMAIL}
+2. Find the password input field and enter the password
+3. Find and click the login/sign-in button
+4. Wait for login to complete
+
+If you see OAuth buttons (Google, GitHub, etc.), you can try clicking them.
+If login fails, try alternative login methods or report the issue.
+"""
+
+            logger.info("[AUTH] Creating Browser-Use agent for login...")
+
+            # Create LLM using Claude
+            llm = ChatAnthropic(
+                model=Config.BROWSER_USE_LLM_MODEL,
+                temperature=0.3,
+                api_key=Config.ANTHROPIC_API_KEY
+            )
+
+            # Get browser instance from current page's context
+            # Note: This assumes we can reuse the browser - may need adjustment
+            browser_config = {
+                'headless': Config.HEADLESS_BROWSER,
+            }
+
+            if Config.USE_PERSISTENT_CONTEXT:
+                browser_config['user_data_dir'] = Config.BROWSER_USER_DATA_DIR
+
+            browser = Browser(config=browser_config)
+
+            # Create login agent
+            login_agent = Agent(
+                task=login_task,
+                llm=llm,
+                browser=browser,
+                max_actions=15  # Limit actions for login
+            )
+
+            logger.info("[AUTH] Executing auto-login with Browser-Use agent...")
+
+            # Execute login
+            history = await login_agent.run()
+
+            logger.info(f"[AUTH] Auto-login agent completed with {len(history.action_results())} actions")
+
+            # Wait a moment for login to settle
+            await asyncio.sleep(3)
+
+            # Verify login succeeded
+            if not await self._is_on_login_page(page):
+                logger.info("[AUTH] Auto-login successful! User is authenticated.")
+                logger.info("[AUTH] ==================== END AUTO-LOGIN ====================")
+                await browser.close()
+                return True
+            else:
+                logger.warning("[AUTH] Auto-login completed but still on login page")
+                logger.info("[AUTH] ==================== END AUTO-LOGIN ====================")
+                await browser.close()
+                return False
+
+        except Exception as e:
+            logger.error(f"[AUTH] Auto-login failed with error: {str(e)}", exc_info=True)
+            logger.info("[AUTH] ==================== END AUTO-LOGIN ====================")
+            return False
 
     async def _manual_login_prompt(self, page: Page, app_name: str) -> bool:
         """

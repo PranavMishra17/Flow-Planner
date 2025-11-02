@@ -30,5 +30,5 @@ Thumbs.db
 
 # Output
 
-output/
 dist/
+.claude/settings.local.json

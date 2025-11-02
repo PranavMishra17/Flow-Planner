@@ -45,8 +45,8 @@ print("[INFO] Job queued successfully")
 
 INCORRECT:
 ```python
-logging.info("🧠 Planning phase started")  # NEVER DO THIS
-print("✅ Job complete")  # NEVER DO THIS
+logging.info("[EMOJI] Planning phase started")  # NEVER DO THIS - emojis forbidden
+print("[EMOJI] Job complete")  # NEVER DO THIS - emojis forbidden
 ```
 
 Use text-based indicators instead:

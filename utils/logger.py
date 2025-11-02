@@ -17,7 +17,9 @@ def setup_logging():
     Config.ensure_directories()
 
     # Console handler - INFO level for user feedback
-    console_handler = logging.StreamHandler()
+    # Use UTF-8 encoding to handle special characters from third-party libraries
+    import sys
+    console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(logging.INFO)
     console_formatter = logging.Formatter(
         '%(asctime)s - %(levelname)s - %(message)s',
@@ -25,11 +27,16 @@ def setup_logging():
     )
     console_handler.setFormatter(console_formatter)
 
+    # Set encoding to UTF-8 to prevent Unicode errors
+    if hasattr(console_handler.stream, 'reconfigure'):
+        console_handler.stream.reconfigure(encoding='utf-8', errors='replace')
+
     # File handler with rotation - DEBUG level for detailed debugging
     file_handler = RotatingFileHandler(
         os.path.join(Config.LOGS_DIR, 'app.log'),
         maxBytes=10485760,  # 10MB
-        backupCount=5
+        backupCount=5,
+        encoding='utf-8'  # UTF-8 encoding for file
     )
     file_handler.setLevel(logging.DEBUG)
     file_formatter = logging.Formatter(
@@ -50,6 +57,8 @@ def setup_logging():
     root_logger.addHandler(file_handler)
 
     # Reduce noise from third-party libraries
+    # Set Browser-Use to WARNING to suppress emoji-laden debug logs
+    logging.getLogger('browser_use').setLevel(logging.WARNING)
     logging.getLogger('urllib3').setLevel(logging.WARNING)
     logging.getLogger('playwright').setLevel(logging.WARNING)
     logging.getLogger('anthropic').setLevel(logging.WARNING)

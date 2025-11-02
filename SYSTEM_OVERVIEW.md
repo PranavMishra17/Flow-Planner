@@ -2,76 +2,63 @@
 
 ## Architecture
 
-**Hybrid Execution**: Gemini Planning → Execution with Vision Recovery
+**Autonomous Execution**: Gemini Planning → Browser-Use Agent → State Capture
 
 ## Core Files
 
 ### Configuration & Setup
-- **[config.py](config.py)**: Centralized environment variable configuration (API keys, browser settings, vision recovery settings)
-- **utils/logger.py**: Logging system with console (INFO) and rotating file handlers (DEBUG)
+- **[config.py](config.py)**: Configuration management (API keys, browser settings)
+- **utils/logger.py**: Logging with console and rotating file handlers
 - **.env**: Environment variables including persistent browser profile path
 
 ### Agent Pipeline
 
 **1. [agent/planner.py](agent/planner.py) (GeminiPlanner)**
-- Uses Google Gemini with web search grounding to research workflows
-- Generates COMPLETE execution plans with specific CSS selectors and fallbacks
-- Researches actual UI patterns and selector strategies
-- Output: List of detailed steps with actions (goto, click, fill, wait, scroll)
+- Uses Google Gemini to analyze tasks and detect authentication requirements
+- Outputs high-level workflow outline (no CSS selectors)
+- Returns: task_analysis (auth type, complexity) + workflow_outline steps
 
-**2. [agent/executor.py](agent/executor.py) (PlaywrightExecutor)**
-- Launches Chromium with persistent context (loads saved cookies/logins)
-- Logs all cookies by domain on startup for debugging
-- Calls authenticator before executing workflow
-- **Executes Gemini's plan first** with fallback selectors
-- **Vision Recovery**: Only calls Claude Vision when a step fails
-- Captures screenshots after each step (and on errors)
-- Uses scroll_into_view_if_needed for all interactions (auto-scroll)
+**2. [agent/browser_use_agent.py](agent/browser_use_agent.py) (BrowserUseAgent)**
+- Wrapper for Browser-Use autonomous agent framework
+- Uses Claude Sonnet 4.5 for vision + DOM-based navigation
+- Autonomous perception-cognition-action loop
+- Handles dynamic content, popups, and navigation automatically
+- No pre-programmed selectors required
 
-**3. [agent/vision_guide.py](agent/vision_guide.py) (VisionGuide)**
-- Uses Claude Haiku Vision for error recovery only
-- Analyzes error screenshots and suggests corrective actions
-- Provides few-shot prompting for common scenarios (login, ads, scrolling, form filling)
-- Detects authentication blockers and triggers auth handler automatically
-- Handles dynamic UI elements and unexpected states
+**3. [agent/state_capturer.py](agent/state_capturer.py) (StateCapturer)**
+- Extracts screenshots and metadata from Browser-Use execution history
+- Organizes output into structured directories
+- Generates workflow guides from captured states
 
 **4. [agent/authenticator.py](agent/authenticator.py) (AuthenticationHandler)**
-- **Tier 1**: Checks if already logged in via persistent profile (detects login page URL patterns)
-- **Tier 2**: Auto-detects OAuth buttons (Google/GitHub) and clicks them
-- **Tier 3**: Prompts user for manual login with configurable timeout
-- Logs authentication state: cookies, profile elements, localStorage
-
-**5. [agent/validator.py](agent/validator.py) (ClaudeValidator)**
-- Optional post-execution validation using Claude Vision
-- Resizes images to fit 8000px limit automatically
-- Returns validation with confidence level and reason
+- **Tier 1**: Persistent profile (automatic via saved cookies)
+- **Tier 2**: Browser-Use agent auto-login with credentials from .env
+- **Tier 3**: Manual user login with timeout prompt
 
 ## Data Flow
 
 ```
-User Task → Planner (Gemini grounded search) → Full Execution Plan with selectors
+User Task → Planner (Gemini) → Auth detection + workflow outline
            ↓
-Executor launches browser → Authenticator checks login
+Browser-Use Agent → Autonomous execution
+   - Perception: Screenshot + DOM analysis
+   - Cognition: Claude Sonnet 4.5 reasoning
+   - Action: Dynamic navigation decisions
+   - Loop until workflow complete
            ↓
-Execute each step from Gemini plan:
-   - Try primary selector
-   - Try fallback selectors
-   - If all fail → Vision Recovery (Claude analyzes screenshot)
-       - If authentication blocker detected → Trigger auth handler
-       - Otherwise execute vision's suggested actions
+State Capturer → Extract screenshots + metadata
            ↓
-Capture screenshots → Save to output/runN/
-           ↓
-Optional: Validator (Claude) analyzes final results
+Save to output/{task_name}_{timestamp}/
 ```
 
 ## Key Features
 
-- **Gemini-First Execution**: Fast, reliable execution using researched selectors
-- **Vision Recovery**: Claude Vision only called on errors (cost-effective)
-- **Auto-Scroll**: Built into all interactions via Playwright
-- **Fallback Selectors**: Multiple selector strategies from Gemini research
-- **Ad Detection**: System understands ads don't mean failure
+- **Autonomous Navigation**: Agent decides actions based on live UI state
+- **No Pre-Programmed Selectors**: Adapts to dynamic content automatically
+- **Vision + DOM**: Combined approach for robust navigation
+- **Persistent Authentication**: Saved browser profiles for seamless login
+- **Cost Effective**: Single Claude model, fewer API calls
 
-## Test Script
-- **[test_agent.py](test_agent.py)**: Runs complete pipeline with predefined test cases (YouTube, Supabase, Notion)
+## Test Scripts
+- **[test_browser_use.py](test_browser_use.py)**: Comprehensive test suite (navigation, auth detection)
+- **[run_workflow.py](run_workflow.py)**: Quick workflow capture with predefined tasks
