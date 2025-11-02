@@ -27,3 +27,8 @@ guides/*
 # OS
 .DS_Store
 Thumbs.db
+
+# Output
+
+output/
+dist/

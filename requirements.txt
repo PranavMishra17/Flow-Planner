@@ -14,3 +14,4 @@ anthropic==0.72.0
 # Utilities
 python-engineio==4.12.3
 python-socketio==5.14.1
+Pillow==11.1.0
