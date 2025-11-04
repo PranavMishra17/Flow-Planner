@@ -147,20 +147,28 @@ class RefinementAgent:
         screenshot_steps = []
 
         for state in states:
+            step_num = state.get('step_number')
+
             # Only process steps with screenshots
             if not state.get('screenshot_path'):
+                logger.debug(f"[REFINEMENT] Skipping step {step_num}: No screenshot")
                 continue
 
-            # Skip navigation, wait, and done steps (no refinement needed)
-            description = state.get('description', '').lower()
-            if any(skip in description for skip in ['navigate to url', 'waited for', 'is_done']):
-                logger.debug(f"[REFINEMENT] Skipping step {state.get('step_number')}: Navigation/wait/done")
-                continue
-
-            # Check for actual UI actions
+            # Check action list to determine if this is a refineable step
             action = state.get('action', {})
             action_list = action.get('action', [])
 
+            # Skip if this is a done action (actual done action, not 'is_done' field in description)
+            if any('done' in str(action_item) and isinstance(action_item, dict) and 'done' in action_item for action_item in action_list):
+                logger.debug(f"[REFINEMENT] Skipping step {step_num}: Done action")
+                continue
+
+            # Skip navigation actions
+            if any('navigate' in str(action_item) for action_item in action_list):
+                logger.debug(f"[REFINEMENT] Skipping step {step_num}: Navigation")
+                continue
+
+            # Check for actual UI actions (clicks and inputs)
             has_ui_action = any(
                 key in action_item
                 for action_item in action_list
@@ -169,7 +177,9 @@ class RefinementAgent:
 
             if has_ui_action:
                 screenshot_steps.append(state)
-                logger.debug(f"[REFINEMENT] Including step {state.get('step_number')} for refinement")
+                logger.info(f"[REFINEMENT] Including step {step_num} for refinement (has UI action)")
+            else:
+                logger.debug(f"[REFINEMENT] Skipping step {step_num}: No UI action")
 
         return screenshot_steps
 

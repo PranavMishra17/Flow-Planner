@@ -311,28 +311,50 @@ class StateCapturer:
 
     def _filter_meaningful_states(self, states: List[Dict]) -> List[Dict]:
         """
-        Filter states to only exclude truly unnecessary steps.
+        Filter states to create a CLEAN SUCCESS PATH for the workflow guide.
+
+        This creates an instruction manual showing only successful actions,
+        NOT a history log of all attempts including failures.
 
         INCLUDE:
         - Initial navigation (first step to app URL)
-        - Authentication steps and checks
-        - All user interactions (clicks, inputs)
-        - Completion states
+        - Successful user interactions that moved the workflow forward
+        - Final completion state
 
-        EXCLUDE ONLY:
-        - Mid-workflow screenshot verification steps
+        EXCLUDE:
+        - Failed actions and retries
+        - Debugging/troubleshooting steps
+        - Screenshot verification steps
         - Internal processing errors
-        - Redundant wait actions (unless they're the first wait after navigation)
+        - Redundant/repeated actions on same element
 
         Args:
-            states: All captured states
+            states: All captured states from Browser-Use execution
 
         Returns:
-            Filtered list of meaningful states
+            Clean list of successful workflow steps
         """
-        meaningful_states = []
+        # Step 1: Basic filtering (errors, screenshots, waits)
+        initial_filtered = self._basic_filter(states)
+
+        # Step 2: Remove failed actions and keep only successful final attempts
+        success_path = self._extract_success_path(initial_filtered)
+
+        logger.info(f"[CAPTURE] Filtered {len(states)} states → {len(initial_filtered)} meaningful → {len(success_path)} clean success path")
+        return success_path
+
+    def _basic_filter(self, states: List[Dict]) -> List[Dict]:
+        """
+        Basic filtering: remove obvious non-instructional steps.
+
+        Args:
+            states: All states
+
+        Returns:
+            States after basic filtering
+        """
+        filtered = []
         seen_navigation = False
-        seen_wait = False
 
         for state in states:
             action = state.get('action', {})
@@ -340,57 +362,137 @@ class StateCapturer:
             description = state.get('description', '').lower()
             step_num = state.get('step_number', 0)
 
-            # Always exclude internal processing errors
+            # Exclude internal processing errors
             if 'invalid model output format' in description:
-                logger.debug(f"[CAPTURE] Excluding step {step_num}: Internal processing error")
+                logger.debug(f"[CAPTURE] Excluding step {step_num}: Internal error")
                 continue
 
-            # Exclude screenshot-only verification steps (no other actions)
+            # Exclude screenshot-only verification steps
             if 'requested screenshot' in description and len(action_list) == 1:
-                is_screenshot_only = False
-                for action_item in action_list:
-                    if 'screenshot' in action_item and len(action_item) == 1:
-                        is_screenshot_only = True
-                        break
-                if is_screenshot_only:
-                    logger.debug(f"[CAPTURE] Excluding step {step_num}: Screenshot-only verification")
+                if any('screenshot' in str(a) for a in action_list):
+                    logger.debug(f"[CAPTURE] Excluding step {step_num}: Screenshot verification")
                     continue
 
-            # Include initial navigation (first navigate action)
+            # Include initial navigation (once)
             if 'navigate to url' in description and not seen_navigation:
                 seen_navigation = True
-                meaningful_states.append(state)
+                filtered.append(state)
                 logger.debug(f"[CAPTURE] Including step {step_num}: Initial navigation")
                 continue
 
-            # Include first wait (usually for page load)
-            if 'waited for' in description and not seen_wait:
-                seen_wait = True
-                meaningful_states.append(state)
-                logger.debug(f"[CAPTURE] Including step {step_num}: Initial page load wait")
+            # Exclude wait steps (not instructional)
+            if 'waited for' in description:
+                logger.debug(f"[CAPTURE] Excluding step {step_num}: Wait step")
                 continue
 
-            # Exclude subsequent waits (unless they have other actions)
-            if 'waited for' in description and seen_wait:
-                if len(action_list) <= 1:
-                    logger.debug(f"[CAPTURE] Excluding step {step_num}: Redundant wait")
-                    continue
-
-            # Include all other meaningful interactions
-            has_action = False
-            for action_item in action_list:
-                if any(key in action_item for key in ['click', 'input', 'done', 'navigate']):
-                    has_action = True
-                    break
+            # Check for meaningful actions
+            has_action = any(
+                key in action_item
+                for action_item in action_list
+                for key in ['click', 'input', 'done']
+            )
 
             if has_action:
-                meaningful_states.append(state)
-                logger.debug(f"[CAPTURE] Including step {step_num}: Has user action")
-            else:
-                logger.debug(f"[CAPTURE] Excluding step {step_num}: No meaningful action")
+                filtered.append(state)
+                logger.debug(f"[CAPTURE] Including step {step_num}: Has action")
 
-        logger.info(f"[CAPTURE] Filtered {len(states)} states to {len(meaningful_states)} contextual steps")
-        return meaningful_states
+        return filtered
+
+    def _extract_success_path(self, states: List[Dict]) -> List[Dict]:
+        """
+        Extract clean success path by removing failed attempts and retries.
+
+        Strategy:
+        1. Detect failed actions (errors in description)
+        2. Detect repeated actions on same element/target
+        3. Keep only the last successful occurrence of each unique action
+        4. Remove debugging/correction steps
+
+        Args:
+            states: Basically filtered states
+
+        Returns:
+            Clean success path
+        """
+        success_path = []
+        action_tracker = {}  # Track actions by target/type
+
+        for state in states:
+            description = state.get('description', '').lower()
+            action = state.get('action', {})
+            action_list = action.get('action', [])
+            step_num = state.get('step_number')
+
+            # Skip if this describes a failure or error
+            if any(keyword in description for keyword in [
+                'failed', 'error', 'could not', 'unable', 'not found',
+                'incorrect', 'invalid', 're-input', 're-focusing',
+                'troubleshoot', 'attempt to', 'trying again'
+            ]):
+                logger.debug(f"[CAPTURE] Excluding step {step_num}: Failure/retry indicator")
+                continue
+
+            # Skip done action (already implicit in success)
+            if any('done' in str(a) for a in action_list):
+                logger.debug(f"[CAPTURE] Excluding step {step_num}: Done action")
+                continue
+
+            # Extract action signature (to detect duplicates)
+            action_signature = self._get_action_signature(action_list)
+
+            if action_signature:
+                # Check if we've seen this action before
+                if action_signature in action_tracker:
+                    # Replace previous occurrence with this one (likely the successful retry)
+                    prev_index = action_tracker[action_signature]
+                    logger.debug(f"[CAPTURE] Replacing previous occurrence of {action_signature} (step {success_path[prev_index].get('step_number')}) with step {step_num}")
+                    success_path[prev_index] = state
+                else:
+                    # New unique action
+                    action_tracker[action_signature] = len(success_path)
+                    success_path.append(state)
+                    logger.debug(f"[CAPTURE] Including step {step_num}: New action {action_signature}")
+            else:
+                # No clear action signature (keep it)
+                success_path.append(state)
+
+        return success_path
+
+    def _get_action_signature(self, action_list: List[Dict]) -> Optional[str]:
+        """
+        Create a signature for an action to detect duplicates.
+
+        Examples:
+        - click on button X → "click:button_X"
+        - input text into field Y → "input:field_Y"
+
+        Args:
+            action_list: List of action dictionaries
+
+        Returns:
+            Action signature string or None
+        """
+        if not action_list:
+            return None
+
+        signatures = []
+        for action_item in action_list:
+            if 'click' in action_item:
+                # Click signature: type + index/element
+                click_data = action_item.get('click', {})
+                index = click_data.get('index', 'unknown')
+                signatures.append(f"click:{index}")
+
+            elif 'input' in action_item or 'input_text' in action_item:
+                # Input signature: type + index
+                input_key = 'input' if 'input' in action_item else 'input_text'
+                input_data = action_item.get(input_key, {})
+                index = input_data.get('index', 'unknown')
+                # Don't include text content (might vary on retry)
+                signatures.append(f"input:{index}")
+
+        # Return combined signature
+        return "|".join(signatures) if signatures else None
 
     def _validate_screenshots(
         self,
@@ -506,70 +608,142 @@ class StateCapturer:
         logger.info(f"[CAPTURE] Validated screenshots for {len(states_with_validated_screenshots)} states")
 
         # Build prompt for Gemini with explicit screenshot rules
-        prompt = f"""You are creating a comprehensive workflow guide that will help a NEW user or agent understand how to complete this task from scratch.
+        prompt = f"""You are creating an INSTRUCTION MANUAL for a future AI agent to execute this task.
 
-**Original Task**: {task_description}
+**CRITICAL PRINCIPLES:**
+1. This is NOT a history log of what happened - it's a RECIPE for how to do it
+2. Write in IMPERATIVE language: "Click the button" NOT "The agent clicked"
+3. Be CONCISE - only essential information
+4. Ensure ALL steps needed to COMPLETE the task are documented
 
-**Workflow Context**:
-- Total Steps Executed: {metadata.get('execution', {}).get('total_steps', 0)}
-- Key Steps to Document: {len(states_with_validated_screenshots)}
+**Task to Complete**: {task_description}
 
-**Captured Workflow Steps**:
+**Workflow Data** (successful execution path):
 {json.dumps(states_with_validated_screenshots, indent=2)}
 
-Generate a detailed, user-friendly step-by-step workflow guide in Markdown format that includes:
+---
 
-**Essential Context (MUST INCLUDE):**
-1. **Initial Setup**: Start with navigation to the application
-   - Format: "Navigate to [App Name] at `https://url.com`"
-   - Include the URL explicitly
-   - Note if user is already authenticated or needs to log in
+## Guide Structure
 
-2. **Complete Workflow Path**: Document the full journey
-   - Include initial navigation and any authentication steps
-   - Show the path through the UI (e.g., "Click Projects in sidebar" → "Click Add Project button")
-   - This helps a new agent understand the complete flow
+### 1. Essential Context Section
 
-**For Each Step Include:**
-- **Step Number** and **Clear Action Description**
-- **URL** (always include if available, especially if it changed)
-- **Screenshot Reference**: CRITICAL RULES FOR SCREENSHOTS
-  - ONLY add screenshot if the state has "has_screenshot": true
-  - ONLY use the EXACT value from "screenshot_path" field (e.g., step_005.png)
-  - If "has_screenshot" is false or missing, DO NOT add any screenshot reference
-  - If "screenshot_path" is missing, DO NOT add any screenshot reference
-  - Format: `![Step X](screenshot_path_value)` - use the exact screenshot_path value
-  - NEVER create screenshot references for steps without "screenshot_path" field
-  - NEVER guess or infer screenshot filenames
-- **What's Happening**: Brief explanation of what's happening in this step
-  - For steps WITH screenshots: WHERE the button/link is located, WHAT the form/modal looks like
-  - For steps WITHOUT screenshots: Just describe the action (navigation, waiting, etc.)
+Start with:
 
-**CRITICAL SCREENSHOT RULES:**
-- Navigation steps (e.g., "Navigate to URL"): NO screenshot reference
-- Wait/loading steps (e.g., "Waited for X seconds"): NO screenshot reference
-- Done/completion actions: NO screenshot reference
-- Button clicks: Include screenshot ONLY if has_screenshot=true
-- Form inputs: Include screenshot ONLY if has_screenshot=true
-- Modal appearances: Include screenshot ONLY if has_screenshot=true
+```markdown
+## Essential Context
 
-**Screenshot Validation:**
-Each state in the workflow data has been pre-validated. Trust the "has_screenshot" field:
-- If "has_screenshot": true → Use the "screenshot_path" value
-- If "has_screenshot": false → DO NOT add any screenshot reference
-- If no "screenshot_path" field → DO NOT add any screenshot reference
+### Initial Setup
+- **Application**: [Name of the application/website]
+- **Starting URL**: `https://example.com`
+- **Authentication**: [REQUIRED - Choose one of the following]
+  * Already logged in (persistent session detected)
+  * Logged in with provided credentials
+  * Manual login required before starting
+  * No login required (public access)
+```
 
-**Format:**
-- Use clear markdown headers (##, ###)
-- Use bullet points for actions
-- Use code blocks for URLs: `https://example.com`
-- Include a workflow summary at the end
+### 2. Complete Workflow Path
 
-**Goal**: A new agent reading this guide should understand:
-- Where to start (URL)
-- How to navigate through the application
-- What each button/form looks like (when screenshots are available)
-- The complete workflow from start to finish
+Provide a numbered list showing the high-level journey:
+```markdown
+### Complete Workflow Path
+1. Navigate to the application
+2. [High-level step, e.g., "Locate and click the Create button"]
+3. [High-level step, e.g., "Fill out the form"]
+4. [Continue until task is COMPLETED]
+```
+
+**CRITICAL**: Verify the last step COMPLETES the task from the original task description.
+- If task says "copy video link", ensure final step shows copying the link
+- If task says "create form", ensure final step shows form creation completed
+- DO NOT stop at intermediate steps
+
+### 3. Detailed Workflow Steps
+
+For each step, use this format:
+
+```markdown
+### Step N: [Action in Imperative Form]
+
+- **Action**: [Concise imperative instruction, e.g., "Click the 'New Project' button"]
+- **URL**: `https://current-url.com`
+- **Screenshot**: ![Step N](screenshot_path_value)  [ONLY if has_screenshot=true]
+```
+
+**Step Description Rules:**
+- Use imperative verbs: "Click", "Type", "Select", "Navigate"
+- Be specific: "Click the blue 'Submit' button in bottom-right corner"
+- Keep it ONE sentence when possible
+- NO verbose explanations or "What's Happening" sections
+
+**Screenshot Rules - STRICT ENFORCEMENT:**
+- ONLY add `![Step X](path)` if state has `"has_screenshot": true`
+- ONLY use EXACT value from `"screenshot_path"` field
+- Navigation steps: NO screenshot
+- Wait/loading steps: NO screenshot
+- Done actions: NO screenshot
+- If `"has_screenshot": false` or missing: NO screenshot line at all
+
+**Examples:**
+
+Good (action-focused):
+```markdown
+### Step 3: Click the Search Button
+
+- **Action**: Click the search button (magnifying glass icon) in the top navigation bar
+- **URL**: `https://youtube.com`
+- **Screenshot**: ![Step 3](step_003.png)
+```
+
+Bad (verbose, history-like):
+```markdown
+### Step 3: Search Button Interaction
+
+The agent then proceeded to click on the search button. What's happening: The page is showing the YouTube homepage with various UI elements. The search button is located in the navigation bar and clicking it will activate the search functionality.
+```
+
+---
+
+## Output Format
+
+Generate the complete guide following this exact structure:
+
+```markdown
+## Essential Context
+
+### Initial Setup
+[Fill this section]
+
+### Complete Workflow Path
+[Numbered list of high-level steps]
+
+---
+
+## Detailed Workflow Steps
+
+### Step 1: [Action]
+[Details]
+
+### Step 2: [Action]
+[Details]
+
+[Continue for all steps...]
+
+---
+
+## Workflow Summary
+
+[Brief 2-3 sentence summary of what was accomplished]
+
+- **Total Steps**: [number]
+- **Key Actions**: [List main actions taken]
+```
+
+**Final Verification:**
+- Does the last documented step COMPLETE the original task?
+- Are all steps written in imperative language?
+- Are screenshot references only where has_screenshot=true?
+- Is the authentication status clearly documented?
 
 Generate the guide now:"""
 

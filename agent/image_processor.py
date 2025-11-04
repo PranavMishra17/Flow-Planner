@@ -64,8 +64,8 @@ class ImageProcessor:
 
             # Validate grid locations
             if not self._validate_grid_locations(grid_locations):
-                logger.warning(f"[IMAGE_PROCESSOR] Invalid grid locations: {grid_locations}, using center")
-                grid_locations = [(2, 2)]  # Fallback to center
+                logger.warning(f"[IMAGE_PROCESSOR] Invalid grid locations: {grid_locations}, using center region")
+                grid_locations = [(2, 1), (2, 2), (2, 3)]  # Fallback to middle row for context
 
             # Calculate bounding box
             bbox = self._calculate_bounding_box(

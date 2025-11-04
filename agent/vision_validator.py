@@ -234,16 +234,27 @@ Analyze the screenshot and provide a structured response answering these questio
    - Does it match the action context?
    - Answer: true or false
 
-2. **Where is the relevant UI element located?**
-   - Use a 3x3 grid system to identify location:
+2. **Where is the relevant UI element located? (Include surrounding context)**
+   - Use a 3x3 grid system to identify the region:
      ```
      (1,1) (1,2) (1,3)  <- Top row
      (2,1) (2,2) (2,3)  <- Middle row
      (3,1) (3,2) (3,3)  <- Bottom row
      ```
-   - If the element spans multiple cells, list all cells
-   - Example: Button in bottom-right corner = [(3,3)]
-   - Example: Modal spanning middle area = [(2,2), (2,3), (3,2), (3,3)]
+   - **CRITICAL**: Select 2-4 cells to include CONTEXT around the element
+   - Include surrounding UI elements (nearby buttons, labels, navigation)
+   - DON'T just select the single cell containing the element - too narrow!
+   - DO select adjacent cells to show WHERE the element is in the interface
+
+   **Examples:**
+   - Search bar at top center: [(1,1), (1,2), (1,3)] - full top row for context
+   - Button in middle area: [(2,2), (2,3)] - button + surrounding context
+   - Form in center: [(2,1), (2,2), (2,3), (3,2)] - form + navigation context
+   - Modal dialog: [(2,2), (2,3), (3,2), (3,3)] - entire modal area
+
+   **Why multiple cells?**
+   The cropped image needs to show not just the element, but WHERE it is in the UI.
+   A future agent needs to see surrounding elements to locate the target element.
 
 3. **Should the step description be improved?**
    - If yes, provide a refined description that:
@@ -263,10 +274,12 @@ Analyze the screenshot and provide a structured response answering these questio
 ```
 
 **Important**:
+- Select 2-4 grid cells (not just 1!) to include context
 - Be precise about grid locations
 - Only mark as valid if the screenshot clearly shows the described element
 - Provide helpful reasoning for your decisions
 - If invalid, explain what's wrong or missing
+- Remember: The goal is to crop to a useful region, not just the exact element
 
 Analyze the screenshot now and respond with ONLY the JSON object."""
 
@@ -304,8 +317,8 @@ Analyze the screenshot now and respond with ONLY the JSON object."""
                 result['is_valid'] = False
 
             if 'grid_locations' not in result or not isinstance(result['grid_locations'], list):
-                logger.warning("[VISION_VALIDATOR] Invalid grid_locations, defaulting to center")
-                result['grid_locations'] = [(2, 2)]
+                logger.warning("[VISION_VALIDATOR] Invalid grid_locations, defaulting to center region")
+                result['grid_locations'] = [(2, 1), (2, 2), (2, 3)]  # Middle row for context
 
             # Convert grid_locations to list of tuples
             result['grid_locations'] = [tuple(loc) for loc in result['grid_locations']]
@@ -327,7 +340,7 @@ Analyze the screenshot now and respond with ONLY the JSON object."""
             # Return fallback result
             return {
                 "is_valid": False,
-                "grid_locations": [(2, 2)],
+                "grid_locations": [(2, 1), (2, 2), (2, 3)],  # Middle row for context
                 "suggested_description": step_context.get('step_description', ''),
                 "reasoning": f"Failed to parse response: {str(e)}"
             }
@@ -337,7 +350,7 @@ Analyze the screenshot now and respond with ONLY the JSON object."""
 
             return {
                 "is_valid": False,
-                "grid_locations": [(2, 2)],
+                "grid_locations": [(2, 1), (2, 2), (2, 3)],  # Middle row for context
                 "suggested_description": step_context.get('step_description', ''),
                 "reasoning": f"Parse error: {str(e)}"
             }
