@@ -9,6 +9,7 @@ from agent.planner import GeminiPlanner
 from agent.browser_use_agent import BrowserUseAgent
 from agent.state_capturer import StateCapturer
 from agent.refinement_agent import RefinementAgent
+from utils.markdown_visualizer import MarkdownVisualizer
 from config import Config
 from utils.logger import setup_logging
 
@@ -114,12 +115,13 @@ async def run_workflow(task: str, app_url: str = None, app_name: str = None):
             print(f"  - Guide: {guide_path}")
 
         # Step 5: Optional refinement with Vision AI
+        refined_guide_path = None
         if Config.ENABLE_REFINEMENT and guide_path:
             print(f"\n[OPTIONAL] Refine workflow with Vision AI? (y/n): ", end='')
             response = input().strip().lower()
 
             if response == 'y':
-                print(f"\n[5/5] Refining workflow with Vision AI...")
+                print(f"\n[5/6] Refining workflow with Vision AI...")
                 try:
                     refiner = RefinementAgent(
                         primary_model=Config.REFINEMENT_MODEL,
@@ -142,6 +144,9 @@ async def run_workflow(task: str, app_url: str = None, app_name: str = None):
                         print(f"  - Refined steps: {refined_count}/{total_count}")
                         print(f"  - Enhanced guide: {refinement_result['refined_guide_path']}")
                         print(f"  - Refinement metadata: {refinement_result['refinement_metadata_path']}")
+
+                        # Use refined guide for visualization
+                        refined_guide_path = refinement_result['refined_guide_path']
                     else:
                         print(f"[WARN] Refinement failed: {refinement_result.get('message', 'Unknown error')}")
 
@@ -150,6 +155,34 @@ async def run_workflow(task: str, app_url: str = None, app_name: str = None):
                     logger.error("Refinement failed", exc_info=True)
             else:
                 print("[INFO] Skipping refinement")
+
+        # Step 6: Optional guide visualization and PDF export
+        if Config.ENABLE_VISUALIZATION and guide_path:
+            # Use refined guide if available, otherwise use original
+            guide_to_visualize = refined_guide_path if refined_guide_path else guide_path
+
+            print(f"\n[OPTIONAL] Visualize workflow guide in browser? (y/n): ", end='')
+            viz_response = input().strip().lower()
+
+            if viz_response == 'y':
+                print(f"\n[6/6] Preparing guide visualization...")
+                try:
+                    visualizer = MarkdownVisualizer(
+                        host=Config.VISUALIZATION_HOST,
+                        port=Config.VISUALIZATION_PORT
+                    )
+
+                    # Generate HTML and open in browser
+                    success = visualizer.preview_in_browser(guide_to_visualize, cleanup_html=False)
+
+                    if not success:
+                        print(f"[WARN] Visualization failed")
+
+                except Exception as e:
+                    print(f"[WARN] Visualization failed: {str(e)}")
+                    logger.error("Visualization failed", exc_info=True)
+            else:
+                print("[INFO] Skipping visualization")
 
         return True
 

@@ -18,11 +18,12 @@ class ChatAnthropicAdapter:
     Adapter to make ChatAnthropic compatible with Browser-Use's BaseChatModel interface.
     Adds required attributes: provider, model_name, name
     """
-    def __init__(self, model: str, api_key: str, temperature: float = 0.3):
+    def __init__(self, model: str, api_key: str, temperature: float = 0.3, max_tokens: int = 8192):
         self._chat_model = ChatAnthropic(
             model=model,
             api_key=api_key,
-            temperature=temperature
+            temperature=temperature,
+            max_tokens=max_tokens  # Increase to prevent truncation
         )
         # Required by Browser-Use BaseChatModel
         self.provider = 'anthropic'
@@ -212,7 +213,8 @@ class BrowserUseAgent:
         self.llm = ChatAnthropicAdapter(
             model=Config.BROWSER_USE_LLM_MODEL,
             api_key=Config.ANTHROPIC_API_KEY,
-            temperature=0.3
+            temperature=0.3,
+            max_tokens=Config.BROWSER_USE_MAX_TOKENS
         )
 
         logger.info(f"[BROWSER-USE] Using LLM model: {Config.BROWSER_USE_LLM_MODEL}")

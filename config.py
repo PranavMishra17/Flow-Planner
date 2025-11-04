@@ -69,6 +69,7 @@ class Config:
     # Browser-Use Settings
     BROWSER_USE_MAX_STEPS = int(os.getenv('BROWSER_USE_MAX_STEPS', '50'))  # Max steps for Browser-Use agent
     BROWSER_USE_LLM_MODEL = os.getenv('BROWSER_USE_LLM_MODEL', 'claude-sonnet-4-5-20250929')  # LLM model for Browser-Use agent
+    BROWSER_USE_MAX_TOKENS = int(os.getenv('BROWSER_USE_MAX_TOKENS', '8192'))  # Max tokens per LLM call (prevents truncation)
 
     # Vision Loop Settings
     MAX_ACTIONS_PER_STEP = 10  # Prevent infinite loops within a step
@@ -89,6 +90,12 @@ class Config:
     REFINEMENT_GRID_SIZE = int(os.getenv('REFINEMENT_GRID_SIZE', '3'))  # 3x3 grid for cropping
     REFINEMENT_PADDING = float(os.getenv('REFINEMENT_PADDING', '0.05'))  # 5% padding around crop
     REFINEMENT_AUTO = os.getenv('REFINEMENT_AUTO', 'false').lower() == 'true'  # Auto-refine without prompt
+
+    # Visualization Settings (Markdown Preview & PDF Export)
+    ENABLE_VISUALIZATION = os.getenv('ENABLE_VISUALIZATION', 'true').lower() == 'true'
+    VISUALIZATION_HOST = os.getenv('VISUALIZATION_HOST', 'localhost')
+    VISUALIZATION_PORT = int(os.getenv('VISUALIZATION_PORT', '6419'))
+    AUTO_EXPORT_PDF = os.getenv('AUTO_EXPORT_PDF', 'false').lower() == 'true'
 
     @classmethod
     def validate(cls):
