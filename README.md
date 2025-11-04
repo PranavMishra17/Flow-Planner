@@ -205,8 +205,8 @@ Flow-Planner/
 Per workflow (typical 5-10 steps):
 - Gemini Flash: $0.00 (Free tier)
 - Browser-Use: $0.00 (Open source)
-- Claude Sonnet 4.5: ~$0.02-0.05
-- **Total**: ~$0.02-0.05 per workflow
+- Claude Sonnet 4.5: ~$0.02-0.1
+- **Total**: ~$0.02-0.1 per workflow
 
 ## Troubleshooting
 
@@ -217,10 +217,6 @@ Per workflow (typical 5-10 steps):
 ### "Browser launch failed"
 - Run `playwright install chromium`
 - Check disk space
-
-### "'ChatAnthropic' object has no attribute 'model_name'"
-- This is fixed in the latest version
-- Ensure you're using the updated browser_use_agent.py
 
 ### Agent execution fails
 - Check logs in `logs/app.log`
@@ -253,7 +249,10 @@ Per workflow (typical 5-10 steps):
 Flow Planner uses **pytest** (industry standard) for testing:
 
 ```bash
-# Install test dependencies
+# Install production dependencies first
+pip install -r requirements.txt
+
+# Then install dev/test dependencies
 pip install -r requirements-dev.txt
 
 # Run all tests

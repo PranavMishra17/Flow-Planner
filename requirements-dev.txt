@@ -1,8 +1,6 @@
 # Development and Testing Dependencies
-# Install with: pip install -r requirements.txt -r requirements-dev.txt
-
-# Main dependencies
--r requirements.txt
+# Install with: pip install -r requirements-dev.txt (after installing requirements.txt)
+# NOTE: Do NOT use -r requirements.txt here to avoid dependency conflicts
 
 # Testing framework
 pytest==8.3.4
@@ -15,15 +13,10 @@ pytest-mock==3.14.0
 black==25.1.0
 flake8==7.1.1
 isort==5.13.2
-pylint==3.3.3
 
 # Security scanning
 bandit==1.8.0
-safety==3.3.1
+# safety removed due to psutil version conflict with browser-use
 
-# Type checking
-mypy==1.13.0
-
-# Documentation
-sphinx==8.1.3
-sphinx-rtd-theme==3.0.2
+# Type checking (optional)
+# mypy==1.13.0
