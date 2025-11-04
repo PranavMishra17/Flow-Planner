@@ -101,19 +101,14 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          SECRET_KEY: ${{ secrets.SECRET_KEY || 'test-secret-key-for-ci-only' }}
+          SECRET_KEY: ${{ secrets.FLASK_SECRET_KEY }}
         run: |
           pytest tests/test_deployment.py -v --tb=short
         continue-on-error: false
 
-      - name: Run legacy Flask setup test
-        run: |
-          python test_flask_setup.py
-        continue-on-error: true
-
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: test-results
           path: |
