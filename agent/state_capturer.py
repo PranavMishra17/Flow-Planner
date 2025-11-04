@@ -416,24 +416,36 @@ class StateCapturer:
             action = state.get('action', {})
             action_list = action.get('action', [])
 
+            step_num = state.get('step_number')
+            logger.debug(f"[CAPTURE] Step {step_num}: Validating screenshot")
+            logger.debug(f"[CAPTURE] Step {step_num}: Description: {description[:100]}...")
+            logger.debug(f"[CAPTURE] Step {step_num}: Action list: {action_list}")
+            logger.debug(f"[CAPTURE] Step {step_num}: Screenshot path: {screenshot_path}")
+
             # Determine if this step SHOULD have a screenshot
             needs_screenshot = False
 
             # Check for UI interactions that warrant screenshots
             for action_item in action_list:
-                if any(key in action_item for key in ['click', 'input_text']):
+                logger.debug(f"[CAPTURE] Step {step_num}: Checking action_item: {action_item}")
+                if any(key in action_item for key in ['click', 'input_text', 'input']):
                     needs_screenshot = True
+                    logger.debug(f"[CAPTURE] Step {step_num}: Found UI interaction - needs screenshot")
                     break
+
+            logger.debug(f"[CAPTURE] Step {step_num}: After UI check, needs_screenshot = {needs_screenshot}")
 
             # EXCLUDE screenshots for navigation and wait steps
             if 'navigate to url' in description or 'waited for' in description:
                 needs_screenshot = False
-                logger.debug(f"[CAPTURE] Step {state.get('step_number')}: Navigation/wait - no screenshot needed")
+                logger.debug(f"[CAPTURE] Step {step_num}: Navigation/wait - no screenshot needed")
 
-            # EXCLUDE screenshots for done actions
-            if 'done' in description or any('done' in str(a) for a in action_list):
+            # EXCLUDE screenshots for done actions - check for actual done action, not 'is_done'
+            if any('done' in action_item for action_item in action_list):
                 needs_screenshot = False
-                logger.debug(f"[CAPTURE] Step {state.get('step_number')}: Done action - no screenshot needed")
+                logger.debug(f"[CAPTURE] Step {step_num}: Done action - no screenshot needed")
+
+            logger.debug(f"[CAPTURE] Step {step_num}: Final needs_screenshot = {needs_screenshot}")
 
             # Validate file existence if screenshot is claimed
             if screenshot_path:
@@ -550,7 +562,7 @@ Each state in the workflow data has been pre-validated. Trust the "has_screensho
 **Format:**
 - Use clear markdown headers (##, ###)
 - Use bullet points for actions
-- Use code blocks for URLs: \`https://example.com\`
+- Use code blocks for URLs: `https://example.com`
 - Include a workflow summary at the end
 
 **Goal**: A new agent reading this guide should understand:

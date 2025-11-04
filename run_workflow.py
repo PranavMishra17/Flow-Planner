@@ -8,6 +8,7 @@ import sys
 from agent.planner import GeminiPlanner
 from agent.browser_use_agent import BrowserUseAgent
 from agent.state_capturer import StateCapturer
+from agent.refinement_agent import RefinementAgent
 from config import Config
 from utils.logger import setup_logging
 
@@ -111,6 +112,44 @@ async def run_workflow(task: str, app_url: str = None, app_name: str = None):
         print(f"  - Metadata: {summary['metadata_path']}")
         if guide_path:
             print(f"  - Guide: {guide_path}")
+
+        # Step 5: Optional refinement with Vision AI
+        if Config.ENABLE_REFINEMENT and guide_path:
+            print(f"\n[OPTIONAL] Refine workflow with Vision AI? (y/n): ", end='')
+            response = input().strip().lower()
+
+            if response == 'y':
+                print(f"\n[5/5] Refining workflow with Vision AI...")
+                try:
+                    refiner = RefinementAgent(
+                        primary_model=Config.REFINEMENT_MODEL,
+                        fallback_model=Config.REFINEMENT_FALLBACK,
+                        grid_size=Config.REFINEMENT_GRID_SIZE,
+                        padding_percent=Config.REFINEMENT_PADDING
+                    )
+
+                    refinement_result = await refiner.refine_workflow(
+                        metadata_path=summary['metadata_path'],
+                        workflow_guide_path=guide_path,
+                        task_description=task
+                    )
+
+                    if refinement_result['success']:
+                        refined_count = refinement_result['refined_count']
+                        total_count = refinement_result['total_count']
+
+                        print(f"[OK] Workflow refined!")
+                        print(f"  - Refined steps: {refined_count}/{total_count}")
+                        print(f"  - Enhanced guide: {refinement_result['refined_guide_path']}")
+                        print(f"  - Refinement metadata: {refinement_result['refinement_metadata_path']}")
+                    else:
+                        print(f"[WARN] Refinement failed: {refinement_result.get('message', 'Unknown error')}")
+
+                except Exception as e:
+                    print(f"[WARN] Refinement failed: {str(e)}")
+                    logger.error("Refinement failed", exc_info=True)
+            else:
+                print("[INFO] Skipping refinement")
 
         return True
 

@@ -82,6 +82,14 @@ class Config:
     AD_KEYWORDS = ['advertisement', 'sponsored', 'ad', 'skip ad']  # Keywords for ad detection
     DYNAMIC_WAIT_TIME = 3000  # milliseconds to wait for dynamic content
 
+    # Refinement Settings (Vision AI for screenshot enhancement)
+    ENABLE_REFINEMENT = os.getenv('ENABLE_REFINEMENT', 'true').lower() == 'true'
+    REFINEMENT_MODEL = os.getenv('REFINEMENT_MODEL', 'gemini')  # 'gemini' or 'claude'
+    REFINEMENT_FALLBACK = os.getenv('REFINEMENT_FALLBACK', 'claude')  # Fallback model
+    REFINEMENT_GRID_SIZE = int(os.getenv('REFINEMENT_GRID_SIZE', '3'))  # 3x3 grid for cropping
+    REFINEMENT_PADDING = float(os.getenv('REFINEMENT_PADDING', '0.05'))  # 5% padding around crop
+    REFINEMENT_AUTO = os.getenv('REFINEMENT_AUTO', 'false').lower() == 'true'  # Auto-refine without prompt
+
     @classmethod
     def validate(cls):
         """Validate that required configuration is present"""
