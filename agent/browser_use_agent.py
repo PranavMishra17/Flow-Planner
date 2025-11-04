@@ -198,13 +198,18 @@ class BrowserUseAgent:
     Handles workflow execution using vision + DOM-based navigation.
     """
 
-    def __init__(self):
-        """Initialize Browser-Use agent with configuration"""
+    def __init__(self, log_callback=None):
+        """Initialize Browser-Use agent with configuration
+
+        Args:
+            log_callback: Optional callback function(message, type, step_type) for logging
+        """
         logger.info("[BROWSER-USE] Initializing Browser-Use agent")
 
         # Store config for later browser creation
         self.headless = Config.HEADLESS_BROWSER
         self.user_data_dir = Config.BROWSER_USER_DATA_DIR if Config.USE_PERSISTENT_CONTEXT else None
+        self.log_callback = log_callback  # Store log callback
 
         if self.user_data_dir:
             logger.info(f"[BROWSER-USE] Using persistent profile: {self.user_data_dir}")
@@ -273,6 +278,18 @@ class BrowserUseAgent:
             # Browser-Use v0.9.5 signature: (state, model_output, steps)
             async def capture_screenshot_callback(state, model_output, steps):
                 """Called after each step - captures screenshot directly from page."""
+                # Emit log for this step if callback is available
+                if self.log_callback:
+                    try:
+                        # Extract action description from model_output
+                        action_desc = "Processing step..."
+                        if model_output and hasattr(model_output, 'current_state'):
+                            if hasattr(model_output.current_state, 'evaluation_previous_goal'):
+                                action_desc = str(model_output.current_state.evaluation_previous_goal)
+                        self.log_callback(f"  Step {steps}: {action_desc}", 'info')
+                    except Exception as log_error:
+                        logger.debug(f"[BROWSER-USE] Failed to emit step log: {str(log_error)}")
+
                 try:
                     # Try to get screenshot from state first
                     if hasattr(state, 'screenshot') and state.screenshot:

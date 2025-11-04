@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flow Planner - Retro Workflow Capture</title>
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/tab.png') }}">
+
+    <!-- Press Start 2P Font for retro look -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+
+    <!-- SocketIO -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+
+    <!-- Marked.js for markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <h1 class="title">
+                <img src="{{ url_for('static', filename='images/Title.png') }}" alt="Flow Planner" class="title-logo">
+                FLOW PLANNER
+                <button class="info-link" onclick="openInfoModal()" title="About this project">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="12" y1="16" x2="12" y2="12"/>
+                        <line x1="12" y1="8" x2="12.01" y2="8"/>
+                    </svg>
+                </button>
+                <a href="https://github.com/PranavMishra17/Flow-Planner" target="_blank" class="github-link" title="View on GitHub">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
+                        <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+                    </svg>
+                </a>
+            </h1>
+            <div class="portfolio-section">
+                <a href="https://portfolio-pranav-mishra-paranoid.vercel.app" target="_blank" class="portfolio-link">
+                    <img src="{{ url_for('static', filename='images/me.png') }}" alt="Portfolio" class="portfolio-img">
+                </a>
+                <div class="portfolio-hint">View more of my work</div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <div class="main-container">
+        <!-- Left Panel -->
+        <div class="left-panel">
+            <!-- Collapsible History -->
+            <div class="history-section">
+                <button class="history-toggle" onclick="toggleHistory()">
+                    <span id="history-icon">▶</span> HISTORY
+                </button>
+                <div id="history-content" class="history-content collapsed">
+                    <div id="history-list" class="history-list">
+                        Loading...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Algorithm Overview -->
+            <div class="overview-section">
+                <h2 class="section-title">ALGORITHM</h2>
+                <div class="overview-content">
+                    <div class="overview-step">
+                        <span class="step-num">1</span>
+                        <span class="step-text">PLAN with Gemini</span>
+                    </div>
+                    <div class="overview-step">
+                        <span class="step-num">2</span>
+                        <span class="step-text">EXECUTE with Browser-Use</span>
+                    </div>
+                    <div class="overview-step">
+                        <span class="step-num">3</span>
+                        <span class="step-text">CAPTURE states & screenshots</span>
+                    </div>
+                    <div class="overview-step">
+                        <span class="step-num">4</span>
+                        <span class="step-text">GENERATE workflow guide</span>
+                    </div>
+                    <div class="overview-step">
+                        <span class="step-num">5</span>
+                        <span class="step-text">REFINE with Vision AI</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Input Section -->
+            <div class="input-section">
+                <h2 class="section-title">INPUT</h2>
+                <div class="input-content">
+                    <label for="task-input" class="input-label">TASK:</label>
+                    <textarea
+                        id="task-input"
+                        class="text-input"
+                        rows="3"
+                        placeholder="E.g., Create a new project in Linear"
+                    ></textarea>
+
+                    <label for="app-url-input" class="input-label">APP URL (optional):</label>
+                    <input
+                        type="text"
+                        id="app-url-input"
+                        class="text-input"
+                        placeholder="https://linear.app"
+                    >
+
+                    <label for="app-name-input" class="input-label">APP NAME (optional):</label>
+                    <input
+                        type="text"
+                        id="app-name-input"
+                        class="text-input"
+                        placeholder="Linear"
+                    >
+
+                    <button id="run-btn" class="run-button" onclick="startWorkflow()">
+                        ▶ RUN WORKFLOW
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel - Logs -->
+        <div class="right-panel">
+            <div class="logs-section">
+                <div class="logs-header">
+                    <h2 class="section-title">LIVE LOGS</h2>
+                    <button class="clear-logs-btn" onclick="clearLogs()">CLEAR</button>
+                </div>
+                <div id="logs-container" class="logs-container">
+                    <div class="log-line info">Flow Planner initialized. Ready to capture workflows.</div>
+                    <div class="log-line info">Enter a task and click RUN WORKFLOW to begin.</div>
+                </div>
+                <!-- Action Buttons (shown after workflow completion) -->
+                <div id="action-buttons" class="action-buttons hidden">
+                    <button id="guide-btn" class="action-btn hidden" onclick="openGuide()">
+                        VIEW GUIDE
+                    </button>
+                    <button id="refine-btn" class="action-btn hidden" onclick="startRefinement()">
+                        REFINE
+                    </button>
+                    <button id="refined-guide-btn" class="action-btn hidden" onclick="openRefinedGuide()">
+                        VIEW REFINED GUIDE
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Markdown Viewer Modal -->
+    <div id="markdown-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modal-title" class="section-title">WORKFLOW GUIDE</h2>
+                <button class="close-btn" onclick="closeMarkdownModal()">✕</button>
+            </div>
+            <div id="markdown-viewer" class="markdown-viewer">
+                <!-- Rendered markdown will appear here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Info Modal -->
+    <div id="info-modal" class="modal">
+        <div class="modal-content info-modal-content">
+            <div class="modal-header">
+                <h2 class="section-title">ABOUT FLOW PLANNER</h2>
+                <button class="close-btn" onclick="closeInfoModal()">✕</button>
+            </div>
+            <div class="info-content">
+                <div class="info-logo-container">
+                    <img src="{{ url_for('static', filename='images/Title.png') }}" alt="Flow Planner Logo" class="info-logo">
+                </div>
+                <h3>The Challenge</h3>
+                <p>Imagine you're building part of an AI multi-agent system. <strong>Agent A</strong> sends your agent, <strong>Agent B</strong>, different questions at runtime:</p>
+                <ul>
+                    <li>"How do I create a project in Linear?"</li>
+                    <li>"How do I filter a database in Notion?"</li>
+                    <li>"How do I add a task in Asana?"</li>
+                </ul>
+
+                <p><strong>Your goal:</strong> Build a system that shows Agent A how to perform the requested task. It should automatically navigate the live app and capture screenshots of each UI state in the workflow.</p>
+
+                <p>Agent B <strong>won't know these tasks ahead of time</strong>, so your system must be generalizable: it should handle any kind of request, across different web apps, and capture the right UI states <strong>in real time</strong>.</p>
+
+                <h3>The Problem</h3>
+                <p>Not every UI state has a URL. Consider what needs to be captured for "creating a project in Linear":</p>
+                <ul>
+                    <li>The project list page (has a URL)</li>
+                    <li>The "Create Project" button state</li>
+                    <li>The create modal (no URL)</li>
+                    <li>The form fields (no URL)</li>
+                    <li>Maybe the success state</li>
+                </ul>
+
+                <p>Your system needs to navigate the live application and capture these states programmatically on the fly.</p>
+
+                <h3>The Solution: Flow Planner</h3>
+                <p>This project demonstrates a working solution using a multi-agent architecture:</p>
+
+                <h4>Architecture</h4>
+                <ul>
+                    <li><strong>Gemini Planner:</strong> Takes natural language tasks and creates a high-level workflow plan</li>
+                    <li><strong>Browser-Use Agent:</strong> Autonomous browser agent powered by Claude Sonnet that executes the workflow using vision + DOM understanding</li>
+                    <li><strong>State Capturer:</strong> Captures UI states with screenshots at each step, even for modal dialogs without URLs</li>
+                    <li><strong>Vision Refinement:</strong> Uses Claude Sonnet with vision to enhance guides with detailed UI element identification</li>
+                </ul>
+
+                <h4>Technologies</h4>
+                <ul>
+                    <li><strong>Backend:</strong> Flask + SocketIO for real-time updates</li>
+                    <li><strong>Browser Automation:</strong> Browser-Use (Playwright-based autonomous agent)</li>
+                    <li><strong>AI Models:</strong> Google Gemini (planning), Anthropic Claude Sonnet (execution & vision)</li>
+                    <li><strong>Frontend:</strong> Vanilla JavaScript with retro-styled UI</li>
+                </ul>
+
+                <h4>How It Works</h4>
+                <ol>
+                    <li><strong>Plan:</strong> Gemini analyzes the task and creates a workflow outline</li>
+                    <li><strong>Execute:</strong> Browser-Use agent autonomously navigates the app and performs actions</li>
+                    <li><strong>Capture:</strong> Screenshots and state data are captured at each step</li>
+                    <li><strong>Generate:</strong> AI creates a markdown guide with annotated screenshots</li>
+                    <li><strong>Refine:</strong> Vision AI enhances the guide with detailed UI analysis</li>
+                </ol>
+
+                <div class="info-footer">
+                    <p>Built by <a href="https://portfolio-pranav-mishra-paranoid.vercel.app" target="_blank">Pranav Mishra</a></p>
+                    <p><a href="https://github.com/PranavMishra17/Flow-Planner" target="_blank">View Source on GitHub</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer Status Bar -->
+    <footer class="footer">
+        <div class="footer-content">
+            <span class="footer-item">Status: <span id="status-indicator" class="status-ready">READY</span></span>
+            <span class="footer-separator">|</span>
+            <span class="footer-item">Powered by
+                <a href="https://github.com/browser-use/browser-use" target="_blank" class="footer-link">Browser-Use</a>
+            </span>
+            <span class="footer-separator">|</span>
+            <span class="footer-item">AI:
+                <a href="https://ai.google.dev/gemini-api" target="_blank" class="footer-link">Gemini</a> +
+                <a href="https://www.anthropic.com/claude" target="_blank" class="footer-link">Claude</a>
+            </span>
+            <span class="footer-separator">|</span>
+            <span class="footer-item" id="job-info">No active job</span>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

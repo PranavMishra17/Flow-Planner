@@ -27,8 +27,9 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 from routes.workflows import workflows_bp
 app.register_blueprint(workflows_bp, url_prefix='/api')
 
-# Store reference to socketio for background jobs
-app.socketio = socketio
+# Initialize socketio for background jobs
+from jobs.workflow_runner import init_socketio
+init_socketio(socketio)
 
 
 @app.route('/')
