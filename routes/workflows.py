@@ -10,6 +10,18 @@ logger = logging.getLogger(__name__)
 workflows_bp = Blueprint('workflows', __name__)
 
 
+@workflows_bp.route('/health', methods=['GET'])
+def health_check():
+    """
+    Health check endpoint for monitoring and deployment verification
+    """
+    return jsonify({
+        'status': 'online',
+        'service': 'Flow Planner API',
+        'version': '1.0.0'
+    }), 200
+
+
 @workflows_bp.route('/workflow', methods=['POST'])
 def create_workflow():
     """

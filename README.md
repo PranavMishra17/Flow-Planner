@@ -227,18 +227,58 @@ Per workflow (typical 5-10 steps):
 - Set `HEADLESS_BROWSER=false` to see browser
 - Verify API keys are valid
 
-## Documentation
+## 📚 Documentation
 
-- [SYSTEM_OVERVIEW.md](SYSTEM_OVERVIEW.md) - Architecture and data flow
-- [IMPLEMENTATION_SUCCESS.md](IMPLEMENTATION_SUCCESS.md) - Implementation details
-- [BROWSER_USE_IMPLEMENTATION.md](BROWSER_USE_IMPLEMENTATION.md) - Usage guide
-- [CLEANUP_SUMMARY.md](CLEANUP_SUMMARY.md) - Recent cleanup changes
+### Architecture & Implementation
+- [System Overview](doc/SYSTEM_OVERVIEW.md) - High-level architecture
+- [Browser-Use Implementation](doc/BROWSER_USE_IMPLEMENTATION.md) - Agent usage guide
+- [Browser-Use Deep Dive](doc/Browser-Use-Deep-Dive.md) - Technical deep dive
+- [System Overview (Browser-Use)](doc/SYSTEM_OVERVIEW_BROWSER_USE.md) - Browser-Use architecture
+- [Refinement Agent](doc/REFINEMENT_AGENT.md) - Vision refinement details
+- [Visualization](doc/VISUALIZATION.md) - UI visualization features
 
-## Test Status
+### Deployment & DevOps
+- [Railway Deployment Guide](doc/RAILWAY_DEPLOYMENT.md) - Complete Railway setup
+- [Testing Guide](doc/TESTING.md) - pytest testing documentation
+- [GitHub Secrets Setup](doc/GITHUB_SECRETS_SETUP.md) - CI/CD configuration
+- [Deployment Summary](doc/DEPLOY_SUMMARY.md) - Quick deployment reference
+- [Testing & Deployment Complete](doc/TESTING_AND_DEPLOYMENT_COMPLETE.md) - Full setup guide
 
-- [OK] Simple Navigation Test
-- [OK] Planner Auth Detection (3/3 cases)
-- [READY] Authentication Flow Test
+### Flask Application
+- [Flask App Documentation](doc/FLASK_APP.md) - Flask app details
+- [Flask Setup Summary](doc/FLASK_SETUP_SUMMARY.md) - Flask configuration
+
+## 🧪 Testing
+
+Flow Planner uses **pytest** (industry standard) for testing:
+
+```bash
+# Install test dependencies
+pip install -r requirements-dev.txt
+
+# Run all tests
+pytest -v
+
+# Run specific test categories
+pytest tests/test_deployment.py::TestImports -v
+pytest tests/test_deployment.py::TestAPIConnectivity -v
+
+# Run with coverage
+pytest --cov=. --cov-report=html
+```
+
+### Test Categories
+- ✅ **Import Tests** - Verify all dependencies installed
+- ✅ **Configuration Tests** - Validate environment setup
+- ✅ **API Connectivity Tests** - Ping Gemini/Claude APIs
+- ✅ **Flask Tests** - Verify app initialization
+- ✅ **Integration Tests** - End-to-end workflow tests
+
+**Complete testing guide:** [TESTING.md](doc/TESTING.md)
+
+**GitHub Actions setup:** [GITHUB_SECRETS_SETUP.md](doc/GITHUB_SECRETS_SETUP.md)
+
+---
 
 ## 🌐 Deployment
 
@@ -255,13 +295,7 @@ Railway provides full support for WebSockets, background jobs, and browser autom
 4. Add environment variables (see configuration above)
 5. Click "Deploy"
 
-**Full deployment guide:** [RAILWAY_DEPLOYMENT.md](RAILWAY_DEPLOYMENT.md)
-
-### Other Platforms
-
-- **Render:** [DEPLOYMENT.md](DEPLOYMENT.md#render-deployment)
-- **Heroku:** [DEPLOYMENT.md](DEPLOYMENT.md#heroku-deployment)
-- **Docker:** [DEPLOYMENT.md](DEPLOYMENT.md#docker-deployment)
+**Full deployment guide:** [RAILWAY_DEPLOYMENT.md](doc/RAILWAY_DEPLOYMENT.md)
 
 ---
 

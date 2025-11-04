@@ -85,20 +85,37 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
+          cache: 'pip'
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install -r requirements-dev.txt
 
-      - name: Run tests
+      - name: Install Playwright browsers
         run: |
-          # Add pytest when tests are created
-          # pip install pytest pytest-cov
-          # pytest tests/ --cov=. --cov-report=xml
-          echo "✅ No tests configured yet - add tests in tests/ directory"
+          playwright install chromium --with-deps
 
-      - name: Verify Flask app loads
+      - name: Run pytest test suite
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY || 'test-secret-key-for-ci-only' }}
+        run: |
+          pytest tests/test_deployment.py -v --tb=short
+        continue-on-error: false
+
+      - name: Run legacy Flask setup test
         run: |
           python test_flask_setup.py
         continue-on-error: true
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results
+          path: |
+            pytest-report.html
+            .coverage
