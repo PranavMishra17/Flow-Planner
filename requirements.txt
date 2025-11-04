@@ -8,6 +8,10 @@ python-dotenv==1.0.1
 playwright==1.55.0
 browser-use==0.9.5
 
+# LangChain (required by Browser-Use)
+langchain-anthropic>=0.3.0
+langchain-core>=0.3.0
+
 # AI/ML
 google-generativeai==0.8.5
 anthropic==0.72.0
