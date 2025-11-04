@@ -240,6 +240,31 @@ Per workflow (typical 5-10 steps):
 - [OK] Planner Auth Detection (3/3 cases)
 - [READY] Authentication Flow Test
 
+## 🌐 Deployment
+
+### Deploy to Railway (Recommended)
+
+Railway provides full support for WebSockets, background jobs, and browser automation.
+
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=https://github.com/PranavMishra17/Flow-Planner)
+
+**Quick Deploy:**
+1. Click the button above or go to [Railway Dashboard](https://railway.app/new)
+2. Select "Deploy from GitHub repo"
+3. Choose `Flow-Planner` repository
+4. Add environment variables (see configuration above)
+5. Click "Deploy"
+
+**Full deployment guide:** [RAILWAY_DEPLOYMENT.md](RAILWAY_DEPLOYMENT.md)
+
+### Other Platforms
+
+- **Render:** [DEPLOYMENT.md](DEPLOYMENT.md#render-deployment)
+- **Heroku:** [DEPLOYMENT.md](DEPLOYMENT.md#heroku-deployment)
+- **Docker:** [DEPLOYMENT.md](DEPLOYMENT.md#docker-deployment)
+
+---
+
 ## License
 
 See [LICENSE](LICENSE) file for details.

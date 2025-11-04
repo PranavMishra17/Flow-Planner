@@ -27,6 +27,7 @@ guides/*
 # OS
 .DS_Store
 Thumbs.db
+nul
 
 # Output
 
