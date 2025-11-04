@@ -309,6 +309,158 @@ class StateCapturer:
                 logger.error(f"[CAPTURE] Fallback guide generation also failed: {str(fallback_error)}")
                 raise
 
+    def _filter_meaningful_states(self, states: List[Dict]) -> List[Dict]:
+        """
+        Filter states to only exclude truly unnecessary steps.
+
+        INCLUDE:
+        - Initial navigation (first step to app URL)
+        - Authentication steps and checks
+        - All user interactions (clicks, inputs)
+        - Completion states
+
+        EXCLUDE ONLY:
+        - Mid-workflow screenshot verification steps
+        - Internal processing errors
+        - Redundant wait actions (unless they're the first wait after navigation)
+
+        Args:
+            states: All captured states
+
+        Returns:
+            Filtered list of meaningful states
+        """
+        meaningful_states = []
+        seen_navigation = False
+        seen_wait = False
+
+        for state in states:
+            action = state.get('action', {})
+            action_list = action.get('action', [])
+            description = state.get('description', '').lower()
+            step_num = state.get('step_number', 0)
+
+            # Always exclude internal processing errors
+            if 'invalid model output format' in description:
+                logger.debug(f"[CAPTURE] Excluding step {step_num}: Internal processing error")
+                continue
+
+            # Exclude screenshot-only verification steps (no other actions)
+            if 'requested screenshot' in description and len(action_list) == 1:
+                is_screenshot_only = False
+                for action_item in action_list:
+                    if 'screenshot' in action_item and len(action_item) == 1:
+                        is_screenshot_only = True
+                        break
+                if is_screenshot_only:
+                    logger.debug(f"[CAPTURE] Excluding step {step_num}: Screenshot-only verification")
+                    continue
+
+            # Include initial navigation (first navigate action)
+            if 'navigate to url' in description and not seen_navigation:
+                seen_navigation = True
+                meaningful_states.append(state)
+                logger.debug(f"[CAPTURE] Including step {step_num}: Initial navigation")
+                continue
+
+            # Include first wait (usually for page load)
+            if 'waited for' in description and not seen_wait:
+                seen_wait = True
+                meaningful_states.append(state)
+                logger.debug(f"[CAPTURE] Including step {step_num}: Initial page load wait")
+                continue
+
+            # Exclude subsequent waits (unless they have other actions)
+            if 'waited for' in description and seen_wait:
+                if len(action_list) <= 1:
+                    logger.debug(f"[CAPTURE] Excluding step {step_num}: Redundant wait")
+                    continue
+
+            # Include all other meaningful interactions
+            has_action = False
+            for action_item in action_list:
+                if any(key in action_item for key in ['click', 'input', 'done', 'navigate']):
+                    has_action = True
+                    break
+
+            if has_action:
+                meaningful_states.append(state)
+                logger.debug(f"[CAPTURE] Including step {step_num}: Has user action")
+            else:
+                logger.debug(f"[CAPTURE] Excluding step {step_num}: No meaningful action")
+
+        logger.info(f"[CAPTURE] Filtered {len(states)} states to {len(meaningful_states)} contextual steps")
+        return meaningful_states
+
+    def _validate_screenshots(
+        self,
+        states: List[Dict],
+        screenshots_dir: str
+    ) -> List[Dict]:
+        """
+        Validate screenshot existence and categorize steps by screenshot necessity.
+
+        Args:
+            states: Filtered meaningful states
+            screenshots_dir: Directory containing screenshots
+
+        Returns:
+            States with validated screenshot information
+        """
+        validated_states = []
+
+        for state in states:
+            state_copy = state.copy()
+            screenshot_path = state.get('screenshot_path', '')
+            description = state.get('description', '').lower()
+            action = state.get('action', {})
+            action_list = action.get('action', [])
+
+            # Determine if this step SHOULD have a screenshot
+            needs_screenshot = False
+
+            # Check for UI interactions that warrant screenshots
+            for action_item in action_list:
+                if any(key in action_item for key in ['click', 'input_text']):
+                    needs_screenshot = True
+                    break
+
+            # EXCLUDE screenshots for navigation and wait steps
+            if 'navigate to url' in description or 'waited for' in description:
+                needs_screenshot = False
+                logger.debug(f"[CAPTURE] Step {state.get('step_number')}: Navigation/wait - no screenshot needed")
+
+            # EXCLUDE screenshots for done actions
+            if 'done' in description or any('done' in str(a) for a in action_list):
+                needs_screenshot = False
+                logger.debug(f"[CAPTURE] Step {state.get('step_number')}: Done action - no screenshot needed")
+
+            # Validate file existence if screenshot is claimed
+            if screenshot_path:
+                full_path = os.path.join(screenshots_dir, screenshot_path)
+                if os.path.exists(full_path):
+                    if needs_screenshot:
+                        state_copy['has_screenshot'] = True
+                        state_copy['screenshot_path'] = screenshot_path
+                        logger.info(f"[CAPTURE] Step {state.get('step_number')}: Screenshot validated and needed")
+                    else:
+                        # Screenshot exists but not needed for this type of step
+                        state_copy['has_screenshot'] = False
+                        state_copy.pop('screenshot_path', None)
+                        logger.info(f"[CAPTURE] Step {state.get('step_number')}: Screenshot exists but not needed for this step type")
+                else:
+                    # Screenshot claimed but doesn't exist - hallucination
+                    state_copy['has_screenshot'] = False
+                    state_copy.pop('screenshot_path', None)
+                    logger.warning(f"[CAPTURE] Step {state.get('step_number')}: Screenshot {screenshot_path} does not exist - removing reference")
+            else:
+                state_copy['has_screenshot'] = False
+                logger.debug(f"[CAPTURE] Step {state.get('step_number')}: No screenshot available")
+
+            validated_states.append(state_copy)
+
+        return validated_states
+
     async def _generate_guide_with_gemini(
         self,
         metadata: Dict,
@@ -330,39 +482,84 @@ class StateCapturer:
         genai.configure(api_key=Config.GEMINI_API_KEY)
         model = genai.GenerativeModel(Config.GEMINI_MODEL)
 
-        # Prepare context for Gemini
-        states = metadata.get('states', [])
+        # Prepare context for Gemini - filter to only meaningful states
+        all_states = metadata.get('states', [])
+        states = self._filter_meaningful_states(all_states)
 
-        # Build prompt for Gemini
-        prompt = f"""You are analyzing a captured UI workflow for the following task:
+        # CRITICAL: Validate and categorize screenshots
+        states_with_validated_screenshots = self._validate_screenshots(
+            states,
+            screenshots_dir
+        )
+        logger.info(f"[CAPTURE] Validated screenshots for {len(states_with_validated_screenshots)} states")
+
+        # Build prompt for Gemini with explicit screenshot rules
+        prompt = f"""You are creating a comprehensive workflow guide that will help a NEW user or agent understand how to complete this task from scratch.
 
 **Original Task**: {task_description}
 
-**Workflow Metadata**:
-- Total Steps: {metadata.get('execution', {}).get('total_steps', 0)}
-- Successful Steps: {metadata.get('execution', {}).get('successful_steps', 0)}
+**Workflow Context**:
+- Total Steps Executed: {metadata.get('execution', {}).get('total_steps', 0)}
+- Key Steps to Document: {len(states_with_validated_screenshots)}
 
-**Steps Taken**:
-{json.dumps(states, indent=2)}
+**Captured Workflow Steps**:
+{json.dumps(states_with_validated_screenshots, indent=2)}
 
-Please generate a comprehensive, user-friendly step-by-step workflow guide in Markdown format that:
+Generate a detailed, user-friendly step-by-step workflow guide in Markdown format that includes:
 
-1. Includes a clear title and task description
-2. Lists each step with:
-   - Step number and clear action description
-   - The URL if relevant
-   - Key actions taken (clicks, inputs, navigations)
-   - Reference to the screenshot file (format: `![Step X](step_XXX.png)`)
-3. Provides helpful notes about what happens at each step
-4. Includes tips or important observations
-5. Has a summary at the end
+**Essential Context (MUST INCLUDE):**
+1. **Initial Setup**: Start with navigation to the application
+   - Format: "Navigate to [App Name] at `https://url.com`"
+   - Include the URL explicitly
+   - Note if user is already authenticated or needs to log in
 
-Format the guide professionally with proper markdown headers, bullet points, and inline screenshots.
+2. **Complete Workflow Path**: Document the full journey
+   - Include initial navigation and any authentication steps
+   - Show the path through the UI (e.g., "Click Projects in sidebar" → "Click Add Project button")
+   - This helps a new agent understand the complete flow
 
-The screenshots are named: step_001.png, step_002.png, etc.
+**For Each Step Include:**
+- **Step Number** and **Clear Action Description**
+- **URL** (always include if available, especially if it changed)
+- **Screenshot Reference**: CRITICAL RULES FOR SCREENSHOTS
+  - ONLY add screenshot if the state has "has_screenshot": true
+  - ONLY use the EXACT value from "screenshot_path" field (e.g., step_005.png)
+  - If "has_screenshot" is false or missing, DO NOT add any screenshot reference
+  - If "screenshot_path" is missing, DO NOT add any screenshot reference
+  - Format: `![Step X](screenshot_path_value)` - use the exact screenshot_path value
+  - NEVER create screenshot references for steps without "screenshot_path" field
+  - NEVER guess or infer screenshot filenames
+- **What's Happening**: Brief explanation of what's happening in this step
+  - For steps WITH screenshots: WHERE the button/link is located, WHAT the form/modal looks like
+  - For steps WITHOUT screenshots: Just describe the action (navigation, waiting, etc.)
 
-IMPORTANT: Include the screenshot references for EVERY step where a screenshot exists.
-"""
+**CRITICAL SCREENSHOT RULES:**
+- Navigation steps (e.g., "Navigate to URL"): NO screenshot reference
+- Wait/loading steps (e.g., "Waited for X seconds"): NO screenshot reference
+- Done/completion actions: NO screenshot reference
+- Button clicks: Include screenshot ONLY if has_screenshot=true
+- Form inputs: Include screenshot ONLY if has_screenshot=true
+- Modal appearances: Include screenshot ONLY if has_screenshot=true
+
+**Screenshot Validation:**
+Each state in the workflow data has been pre-validated. Trust the "has_screenshot" field:
+- If "has_screenshot": true → Use the "screenshot_path" value
+- If "has_screenshot": false → DO NOT add any screenshot reference
+- If no "screenshot_path" field → DO NOT add any screenshot reference
+
+**Format:**
+- Use clear markdown headers (##, ###)
+- Use bullet points for actions
+- Use code blocks for URLs: \`https://example.com\`
+- Include a workflow summary at the end
+
+**Goal**: A new agent reading this guide should understand:
+- Where to start (URL)
+- How to navigate through the application
+- What each button/form looks like (when screenshots are available)
+- The complete workflow from start to finish
+
+Generate the guide now:"""
 
         try:
             # Generate content

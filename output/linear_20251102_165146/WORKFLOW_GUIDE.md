@@ -10,100 +10,104 @@
 
 # Workflow Guide: Creating a Project on Linear
 
-This guide details the successful execution of the task to create a new project within an existing Linear workspace, overcoming initial navigation issues.
+This guide details the step-by-step process for a new user or agent to create a new project within the Linear application, starting from the initial navigation.
 
-**Original Task**: Create a project on Linear.
+---
+
+## Essential Context & Initial Setup
+
+This workflow assumes you are starting from a clean state where you need to navigate to the Linear application. **The captured workflow indicates that the agent was already authenticated in a workspace (`Firstone17`) after the initial navigation attempt stabilized.**
+
+*   **Application:** Linear
+*   **Initial URL:** \`https://linear.app\`
+
+---
+
+## Complete Workflow Path
+
+The process involves navigating to the platform, finding the existing workspace, accessing the Projects section, initiating project creation, filling out the required details, and finalizing the creation.
+
+### Step 1: Initial Navigation to Linear
+
+The first step is to navigate to the Linear application homepage.
+
+*   **Step 1 Action:** Navigate to Linear at \`https://linear.app\`
+*   **URL:** \`https://linear.app\`
+*   **What's Happening:** This initial navigation attempt timed out, suggesting the Single Page Application (SPA) took time to load. A subsequent wait was required for the interface to appear.
+*   **Screenshot Reference:** ![Step 1](step_001.png)
+
+### Step 2: Wait for Application Load
+
+Following the initial timeout, a deliberate wait was executed to allow the fully interactive Linear SPA to load.
+
+*   **Step 2 Action:** Wait 5 seconds for the page to fully initialize.
+*   **URL:** \`https://linear.app/\`
+*   **What's Happening:** The screenshot confirms the application has successfully loaded, and the agent is now inside the "Firstone17" workspace, viewing the active issues list (Team FIR). Authentication is complete.
+*   **Screenshot Reference:** ![Step 2](step_002.png)
+
+### Step 3: Navigate to the Projects View
+
+From the active issues list, the agent must navigate to the dedicated area for managing projects.
+
+*   **Step 3 Action:** Click on the **"Projects"** link in the left-hand sidebar navigation.
+*   **URL:** \`https://linear.app/firstone17/team/FIR/active\` (URL before navigating to projects)
+*   **What's Happening:** The screenshot shows the main Linear interface. The target is the "Projects" link located in the sidebar menu, below the team view options. This click successfully navigates the user to the projects overview page.
+*   **Screenshot Reference:** ![Step 3](step_003.png)
+
+### Step 4: Initiate Project Creation
+
+Once on the Projects overview page, the button to add a new project is selected.
+
+*   **Step 4 Action:** Click the **"Add project"** button.
+*   **URL:** \`https://linear.app/firstone17/projects/all\`
+*   **What's Happening:** This screenshot displays the Projects list, showing one existing project ("Q4 Product Launch"). The target button, **"Add project"**, is located in the top-right header area of the main content pane. Clicking this opens the project creation modal.
+*   **Screenshot Reference:** ![Step 4](step_005.png)
+    *(Note: This step maps to step 5 in the execution log due to system logging structure.)*
+
+### Step 5: Input Project Details (Name and Summary)
+
+The project creation modal appears, requiring input for key identifying information.
+
+*   **Step 5 Action:** Input the desired **Project Name** and **Summary** into the corresponding text fields.
+    *   **Project Name:** `Website Redesign Project`
+    *   **Summary:** `Complete overhaul of company website with modern design and improved UX`
+*   **URL:** \`https://linear.app/firstone17/projects/all\`
+*   **What's Happening:** The screenshot shows the modal overlay titled "New project." We have filled the first two mandatory fields (Name and Summary). Other fields (Status, Priority, Lead, Members) retain their default settings.
+*   **Screenshot Reference:** ![Step 5](step_006.png)
+    *(Note: This step maps to step 6 in the execution log.)*
+
+### Step 6: Finalize and Create Project
+
+With the details entered, the final action is to submit the form.
+
+*   **Step 6 Action:** Click the **"Create project"** button at the bottom of the modal.
+*   **URL:** \`https://linear.app/firstone17/projects/all\`
+*   **What's Happening:** The screenshot captures the state immediately before clicking "Create project" (index 3896). This action submits the form, closes the modal, and adds the new project to the list.
+*   **Screenshot Reference:** ![Step 6](step_007.png)
+    *(Note: This step maps to step 7 in the execution log.)*
+
+### Step 7: Verification (Task Completion)
+
+The task is complete once the new project appears in the projects list.
+
+*   **Step 7 Action:** Task Completed.
+*   **URL:** \`https://linear.app/firstone17/projects/all\`
+*   **What's Happening:** The system confirms the project "Website Redesign Project" is now visible on the main projects page, validating the successful creation.
+*   **Screenshot Reference:** ![Step 7](step_009.png)
+    *(Note: This step maps to step 9 in the execution log, which is the final `done` state.)*
 
 ---
 
 ## Workflow Summary
 
-The workflow involved navigating to Linear, ensuring authentication, accessing the Projects view, initiating the creation process, filling in the required project details (Name and Summary), and finalizing the creation. The initial step required a wait period after a navigation timeout before the interface fully loaded, but the subsequent steps proceeded smoothly to successful project creation.
-
----
-
-## Detailed Step-by-Step Guide
-
-### Step 1: Initial Navigation to Linear
-
-The process began by navigating to the main Linear URL.
-
-*   **Action**: Navigate to `https://linear.app`.
-*   **Observation**: The initial navigation timed out, resulting in an empty page state.
-*   **Screenshot**: ![Step 1](step_001.png)
-
-### Step 2: Waiting for Application Load
-
-After the initial navigation failed to load the Single Page Application (SPA) content immediately, a mandatory wait was introduced to allow the application to initialize.
-
-*   **Action**: Wait for 5 seconds and request a screenshot.
-*   **Observation**: This wait period allowed the Linear interface to load successfully, showing that the agent was already authenticated in the "Firstone17" workspace.
-*   **Screenshot**: ![Step 2](step_002.png)
-
-### Step 3: Navigating to the Projects View
-
-With the interface loaded and authenticated, the next goal was to access the section for managing projects.
-
-*   **Action**: Click the "Projects" link in the sidebar navigation.
-*   **Observation**: This click successfully navigated the user from the active issues view to the main Projects overview page.
-*   **Screenshot**: ![Step 3](step_003.png)
-
-### Step 4: Verification of Projects View Load
-
-A screenshot was taken to confirm the successful navigation to the Projects view after the previous click.
-
-*   **Action**: Request a screenshot to observe the state.
-*   **Observation**: The browser confirmed being on the projects overview page (`/projects/all`), ready for project creation.
-*   **Screenshot**: ![Step 4](step_004.png)
-
-### Step 5: Initiating Project Creation
-
-From the main Projects list, the action to start creating a new project was taken.
-
-*   **Action**: Click the **"Add project"** button (index 3563).
-*   **Observation**: Clicking this button successfully opened the modal form required to define the new project's details.
-*   **Screenshot**: ![Step 5](step_005.png)
-
-### Step 6: Inputting Project Details
-
-The required fields within the project creation form were populated.
-
-*   **Action 1**: Input "Website Redesign Project" into the Project Name field.
-*   **Action 2**: Input "Complete overhaul of company website with modern design and improved UX" into the Project Summary field.
-*   **Observation**: The form accepted the inputs, leaving default settings for Status (Backlog) and Priority (No priority).
-*   **Screenshot**: ![Step 6](step_006.png)
-
-### Step 7: Finalizing Project Creation
-
-The inputs were finalized by submitting the form.
-
-*   **Action**: Click the **"Create project"** button (index 3896).
-*   **Observation**: The system processed the request to create the project.
-*   **Screenshot**: ![Step 7](step_007.png)
-
-### Step 8: System Action (Internal Processing)
-
-This step represents the system's attempt to execute the final click action, which resulted in an internal output format error report, despite the action succeeding in the UI.
-
-*   **Action**: Execution of the "Create project" click.
-*   **Observation**: Although an internal validation error was flagged in the trace, the UI showed success.
-*   **Screenshot**: *(No unique screenshot captured for this internal processing step)*
-
-### Step 9: Task Completion Confirmation
-
-The final step confirms the success of the entire operation by verifying the presence of the new project in the list.
-
-*   **Action**: `done` action called, reporting successful project creation.
-*   **Observation**: The project **"Website Redesign Project"** is visibly listed in the Linear projects view.
-*   **Screenshot**: *(The final state screenshot is effectively represented by the context of the success state in Step 8/9)*
-
----
-
-## Final Notes and Observations
-
-*   **Initial Resilience**: The workflow demonstrated resilience by recovering from a timeout error in Step 1 through a strategic wait period in Step 2, allowing the SPA to fully load.
-*   **Pre-Authenticated State**: The agent was already successfully authenticated in the "Firstone17" workspace, allowing immediate progression to navigating project settings.
-*   **Project Creation Verified**: The creation of the project named **"Website Redesign Project"** was confirmed by its appearance in the main project listing at the end of the workflow.
+| Step | Action Taken | UI Location / Element | Success Confirmation |
+| :--- | :--- | :--- | :--- |
+| 1-2 | Navigate to Linear & Wait | \`https://linear.app\` | Interface loaded & authenticated. |
+| 3 | Go to Projects View | Sidebar "Projects" link | Navigated to `/projects/all` URL. |
+| 4 | Initiate Creation | Top-right "Add project" button | Project creation modal appeared. |
+| 5 | Input Project Details | Modal fields (Name, Summary) | Name & Summary text entered. |
+| 6 | Finalize Creation | Modal "Create project" button | Form submitted, modal closed. |
+| 7 | Verification | Projects List View | **"Website Redesign Project" is visible.** |
 
 ---
 
