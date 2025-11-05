@@ -74,7 +74,7 @@ def emit_status(job_id: str, status: str, data: Optional[Dict] = None):
             logger.error(f"[EMIT_STATUS] Failed to emit: {str(e)}", exc_info=True)
 
 
-def start_workflow_job(task: str, app_url: Optional[str], app_name: Optional[str]) -> str:
+def start_workflow_job(task: str, app_url: Optional[str], app_name: Optional[str], user_settings: Optional[Dict] = None) -> str:
     """
     Start a new workflow capture job in background thread
 
@@ -82,6 +82,7 @@ def start_workflow_job(task: str, app_url: Optional[str], app_name: Optional[str
         task: Task description
         app_url: Optional application URL
         app_name: Optional application name
+        user_settings: Optional dict with user's API keys and model preferences
 
     Returns:
         Job ID
@@ -95,26 +96,29 @@ def start_workflow_job(task: str, app_url: Optional[str], app_name: Optional[str
         'app_url': app_url,
         'app_name': app_name,
         'status': 'starting',
-        'started_at': datetime.now().isoformat()
+        'started_at': datetime.now().isoformat(),
+        'user_settings': user_settings
     }
 
     # Emit initial log immediately
     emit_log(job_id, f"Job {job_id} created, starting workflow...", 'info')
+    if user_settings:
+        emit_log(job_id, "Using user-provided API keys and model preferences", 'info')
 
     # Start background thread
     thread = threading.Thread(
         target=run_workflow_thread,
-        args=(job_id, task, app_url, app_name),
+        args=(job_id, task, app_url, app_name, user_settings),
         daemon=True
     )
     thread.start()
 
-    logger.info(f"[JOB] Started job {job_id}: {task}")
+    logger.info(f"[JOB] Started job {job_id}: {task} (user settings: {bool(user_settings)})")
 
     return job_id
 
 
-def run_workflow_thread(job_id: str, task: str, app_url: Optional[str], app_name: Optional[str]):
+def run_workflow_thread(job_id: str, task: str, app_url: Optional[str], app_name: Optional[str], user_settings: Optional[Dict] = None):
     """Run workflow in background thread"""
     try:
         # Create new event loop for this thread
@@ -122,7 +126,7 @@ def run_workflow_thread(job_id: str, task: str, app_url: Optional[str], app_name
         asyncio.set_event_loop(loop)
 
         # Run async workflow
-        loop.run_until_complete(run_workflow_async(job_id, task, app_url, app_name))
+        loop.run_until_complete(run_workflow_async(job_id, task, app_url, app_name, user_settings))
 
     except Exception as e:
         logger.error(f"[JOB] Job {job_id} failed: {str(e)}", exc_info=True)
@@ -135,7 +139,7 @@ def run_workflow_thread(job_id: str, task: str, app_url: Optional[str], app_name
         loop.close()
 
 
-async def run_workflow_async(job_id: str, task: str, app_url: Optional[str], app_name: Optional[str]):
+async def run_workflow_async(job_id: str, task: str, app_url: Optional[str], app_name: Optional[str], user_settings: Optional[Dict] = None):
     """
     Execute workflow with real-time updates
     Wraps existing run_workflow.py logic
@@ -149,6 +153,29 @@ async def run_workflow_async(job_id: str, task: str, app_url: Optional[str], app
     if app_name:
         emit_log(job_id, f"APP: {app_name} ({app_url or 'auto'})", 'info')
     emit_log(job_id, "="*80, 'info')
+
+    # Store original config values and override with user settings if provided
+    original_config = {}
+    if user_settings:
+        if user_settings.get('gemini_api_key'):
+            original_config['GEMINI_API_KEY'] = Config.GEMINI_API_KEY
+            Config.GEMINI_API_KEY = user_settings['gemini_api_key']
+            emit_log(job_id, "Using user-provided Gemini API key", 'info')
+
+        if user_settings.get('anthropic_api_key'):
+            original_config['ANTHROPIC_API_KEY'] = Config.ANTHROPIC_API_KEY
+            Config.ANTHROPIC_API_KEY = user_settings['anthropic_api_key']
+            emit_log(job_id, "Using user-provided Anthropic API key", 'info')
+
+        if user_settings.get('gemini_model'):
+            original_config['GEMINI_MODEL'] = Config.GEMINI_MODEL
+            Config.GEMINI_MODEL = user_settings['gemini_model']
+            emit_log(job_id, f"Using Gemini model: {user_settings['gemini_model']}", 'info')
+
+        if user_settings.get('claude_model'):
+            original_config['BROWSER_USE_LLM_MODEL'] = Config.BROWSER_USE_LLM_MODEL
+            Config.BROWSER_USE_LLM_MODEL = user_settings['claude_model']
+            emit_log(job_id, f"Using Claude model: {user_settings['claude_model']}", 'info')
 
     try:
         # Update job status
@@ -294,7 +321,7 @@ async def run_workflow_async(job_id: str, task: str, app_url: Optional[str], app
         active_jobs[job_id]['refined_guide_path'] = refined_guide_path
 
         emit_status(job_id, 'completed', {
-            'output_dir': os.path.basename(summary['output_directory']),
+            'output_dir': summary['output_directory'],  # Send full absolute path for refinement
             'guide_path': os.path.basename(guide_path) if guide_path else None,
             'refined_guide_path': os.path.basename(refined_guide_path) if refined_guide_path else None
         })
@@ -305,6 +332,13 @@ async def run_workflow_async(job_id: str, task: str, app_url: Optional[str], app
         active_jobs[job_id]['error'] = str(e)
         emit_log(job_id, f"\n[FAIL] Workflow failed: {str(e)}", 'error')
         emit_status(job_id, 'failed', {'error': str(e)})
+
+    finally:
+        # Restore original config values if we modified them
+        if original_config:
+            for key, value in original_config.items():
+                setattr(Config, key, value)
+            logger.info(f"[JOB {job_id}] Restored original config values")
 
 
 def get_job_status(job_id: str) -> Optional[Dict]:

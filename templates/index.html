@@ -68,34 +68,28 @@
 
             <!-- Algorithm Overview -->
             <div class="overview-section">
-                <h2 class="section-title">ALGORITHM</h2>
-                <div class="overview-content">
-                    <div class="overview-step">
-                        <span class="step-num">1</span>
-                        <span class="step-text">PLAN with Gemini</span>
-                    </div>
-                    <div class="overview-step">
-                        <span class="step-num">2</span>
-                        <span class="step-text">EXECUTE with Browser-Use</span>
-                    </div>
-                    <div class="overview-step">
-                        <span class="step-num">3</span>
-                        <span class="step-text">CAPTURE states & screenshots</span>
-                    </div>
-                    <div class="overview-step">
-                        <span class="step-num">4</span>
-                        <span class="step-text">GENERATE workflow guide</span>
-                    </div>
-                    <div class="overview-step">
-                        <span class="step-num">5</span>
-                        <span class="step-text">REFINE with Vision AI</span>
+                <button class="history-toggle" onclick="toggleAlgorithm()">
+                    <span id="algorithm-icon">▶</span> ALGORITHM
+                </button>
+                <div id="algorithm-content" class="overview-content collapsed">
+                    <div class="algo-description">
+                        <p><strong>📋 Gemini Planner:</strong> Analyzes task → Detects auth → Creates workflow outline</p>
+                        <p><strong>🤖 Browser-Use Agent:</strong> Claude Sonnet 4.5 executes autonomously</p>
+                        <p><strong>👁️ Vision Loop:</strong> Screenshot → DOM → Decision → Action (adaptive, no CSS selectors)</p>
+                        <p><strong>📸 State Capture:</strong> Extract screenshots + metadata from history</p>
+                        <p><strong>✨ Refinement:</strong> Vision AI enhances guide with UI insights</p>
                     </div>
                 </div>
             </div>
 
             <!-- Input Section -->
             <div class="input-section">
-                <h2 class="section-title">INPUT</h2>
+                <div class="section-header">
+                    <h2 class="section-title">INPUT</h2>
+                    <button class="settings-btn" onclick="openSettings()" title="Settings">
+                        ⚙
+                    </button>
+                </div>
                 <div class="input-content">
                     <label for="task-input" class="input-label">TASK:</label>
                     <textarea
@@ -234,6 +228,126 @@
                 <div class="info-footer">
                     <p>Built by <a href="https://portfolio-pranav-mishra-paranoid.vercel.app" target="_blank">Pranav Mishra</a></p>
                     <p><a href="https://github.com/PranavMishra17/Flow-Planner" target="_blank">View Source on GitHub</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content settings-modal-content">
+            <div class="modal-header">
+                <h2 class="section-title">SETTINGS</h2>
+                <button class="close-btn" onclick="closeSettings()">✕</button>
+            </div>
+            <div class="settings-content">
+                <div class="settings-section">
+                    <h3 class="settings-section-title">API CONFIGURATION</h3>
+
+                    <!-- Gemini API -->
+                    <div class="settings-field">
+                        <label class="settings-label">
+                            Gemini API Key
+                            <a href="https://aistudio.google.com/app/apikey" target="_blank" class="settings-link" title="Get your Gemini API key">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                                    <polyline points="15 3 21 3 21 9"></polyline>
+                                    <line x1="10" y1="14" x2="21" y2="3"></line>
+                                </svg>
+                            </a>
+                        </label>
+                        <div class="password-field">
+                            <input type="password" id="gemini-api-key" class="settings-input" placeholder="Enter Gemini API key">
+                            <button class="toggle-visibility" onclick="togglePasswordVisibility('gemini-api-key')" title="Toggle visibility">
+                                <span class="eye-icon">👁</span>
+                            </button>
+                        </div>
+                        <div class="settings-hint">Used for: Planning & Workflow Analysis</div>
+                    </div>
+
+                    <!-- Claude API -->
+                    <div class="settings-field">
+                        <label class="settings-label">
+                            Anthropic API Key
+                            <a href="https://console.anthropic.com/" target="_blank" class="settings-link" title="Get your Anthropic API key">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                                    <polyline points="15 3 21 3 21 9"></polyline>
+                                    <line x1="10" y1="14" x2="21" y2="3"></line>
+                                </svg>
+                            </a>
+                        </label>
+                        <div class="password-field">
+                            <input type="password" id="anthropic-api-key" class="settings-input" placeholder="Enter Anthropic API key">
+                            <button class="toggle-visibility" onclick="togglePasswordVisibility('anthropic-api-key')" title="Toggle visibility">
+                                <span class="eye-icon">👁</span>
+                            </button>
+                        </div>
+                        <div class="settings-hint">Used for: Browser Automation & Vision Refinement</div>
+                    </div>
+
+                    <!-- Status Indicator -->
+                    <div id="api-status" class="api-status hidden">
+                        <span id="api-status-text"></span>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h3 class="settings-section-title">MODEL SELECTION</h3>
+
+                    <!-- Gemini Model -->
+                    <div class="settings-field">
+                        <label class="settings-label">Gemini Model (Planning)</label>
+                        <select id="gemini-model" class="settings-select">
+                            <option value="models/gemini-flash-lite-latest">Gemini Flash Lite (Recommended)</option>
+                            <option value="models/gemini-1.5-flash">Gemini 1.5 Flash</option>
+                            <option value="models/gemini-1.5-pro">Gemini 1.5 Pro</option>
+                        </select>
+                        <div class="settings-hint">Cost: ~$0.00 per workflow (Free tier available)</div>
+                    </div>
+
+                    <!-- Claude Model -->
+                    <div class="settings-field">
+                        <label class="settings-label">Claude Model (Execution)</label>
+                        <select id="claude-model" class="settings-select">
+                            <option value="claude-sonnet-4-5-20250929">Claude Sonnet 4.5 (Recommended)</option>
+                            <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 (Faster, Cheaper)</option>
+                            <option value="claude-opus-4-20250514">Claude Opus 4 (Most Capable)</option>
+                        </select>
+                        <div class="settings-hint">Cost: ~$0.02-0.10 per workflow</div>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h3 class="settings-section-title">COST INFORMATION</h3>
+                    <div class="cost-info">
+                        <div class="cost-row">
+                            <span class="cost-label">Gemini Flash Lite:</span>
+                            <span class="cost-value">Free tier available</span>
+                        </div>
+                        <div class="cost-row">
+                            <span class="cost-label">Claude Sonnet 4.5:</span>
+                            <span class="cost-value">$3/MTok in, $15/MTok out</span>
+                        </div>
+                        <div class="cost-row">
+                            <span class="cost-label">Claude Haiku 4.5:</span>
+                            <span class="cost-value">$1/MTok in, $5/MTok out</span>
+                        </div>
+                        <div class="cost-row">
+                            <span class="cost-label">Typical Workflow:</span>
+                            <span class="cost-value">$0.02-0.10 total</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="settings-actions">
+                    <button id="verify-keys-btn" class="settings-action-btn" onclick="verifyAPIKeys()">
+                        VERIFY KEYS
+                    </button>
+                    <button id="apply-settings-btn" class="settings-action-btn primary" onclick="applySettings()">
+                        APPLY SETTINGS
+                    </button>
                 </div>
             </div>
         </div>

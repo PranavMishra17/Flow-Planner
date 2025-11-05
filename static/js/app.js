@@ -9,12 +9,14 @@ let currentJobId = null;
 let isRunning = false;
 let currentGuidePath = null;
 let currentRefinedGuidePath = null;
+let currentOutputDir = null;
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
     initializeSocketIO();
     loadHistory();
     setupEventListeners();
+    populateSettingsForm();  // Load saved API keys and model preferences
 });
 
 // =============================================================================
@@ -76,16 +78,37 @@ async function startWorkflow() {
     addLog('Starting workflow capture...', 'info');
 
     try {
+        // Get user settings (API keys and model preferences)
+        const settings = getCurrentSettings();
+
+        const requestBody = {
+            task: task,
+            app_url: appUrlInput.value.trim() || null,
+            app_name: appNameInput.value.trim() || null
+        };
+
+        // Include user settings if provided
+        if (settings) {
+            if (settings.gemini_key) {
+                requestBody.gemini_api_key = settings.gemini_key;
+            }
+            if (settings.anthropic_key) {
+                requestBody.anthropic_api_key = settings.anthropic_key;
+            }
+            if (settings.gemini_model) {
+                requestBody.gemini_model = settings.gemini_model;
+            }
+            if (settings.claude_model) {
+                requestBody.claude_model = settings.claude_model;
+            }
+        }
+
         const response = await fetch('/api/workflow', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                task: task,
-                app_url: appUrlInput.value.trim() || null,
-                app_name: appNameInput.value.trim() || null
-            })
+            body: JSON.stringify(requestBody)
         });
 
         const data = await response.json();
@@ -109,7 +132,7 @@ async function startWorkflow() {
     }
 }
 
-function resetUI() {
+function resetUI(preserveJobId = false) {
     const taskInput = document.getElementById('task-input');
     const appUrlInput = document.getElementById('app-url-input');
     const appNameInput = document.getElementById('app-name-input');
@@ -123,11 +146,14 @@ function resetUI() {
     runBtn.textContent = '▶ RUN WORKFLOW';
 
     updateStatusIndicator('ready');
-    document.getElementById('job-info').textContent = 'No active job';
-    currentJobId = null;
 
-    // Hide action buttons
-    hideActionButtons();
+    // Only reset job ID if not preserving it (for refinement)
+    if (!preserveJobId) {
+        document.getElementById('job-info').textContent = 'No active job';
+        currentJobId = null;
+        // Hide action buttons
+        hideActionButtons();
+    }
 }
 
 // =============================================================================
@@ -161,9 +187,11 @@ function addLog(message, type = 'info', stepType = null) {
 
     logsContainer.appendChild(logLine);
 
-    // Auto-scroll to bottom (use requestAnimationFrame to ensure DOM is updated)
+    // Auto-scroll to bottom - use double requestAnimationFrame for reliability
     requestAnimationFrame(() => {
-        logsContainer.scrollTop = logsContainer.scrollHeight;
+        requestAnimationFrame(() => {
+            logsContainer.scrollTop = logsContainer.scrollHeight;
+        });
     });
 }
 
@@ -187,11 +215,14 @@ function handleStatusUpdate(data) {
         addLog('='.repeat(80), 'success');
 
         if (data.output_dir) {
-            addLog(`Output directory: ${data.output_dir}`, 'info');
+            // Extract folder name for display (cleaner UI)
+            const folderName = data.output_dir.split(/[/\\]/).pop();
+            addLog(`Output directory: ${folderName}`, 'info');
+            currentOutputDir = data.output_dir;  // Store full path for refinement backend call
         }
 
-        // Reset UI first (re-enables inputs, but we'll show buttons after)
-        resetUI();
+        // Reset UI but preserve job ID for refinement
+        resetUI(true);
 
         if (data.guide_path) {
             addLog(`Guide: ${data.guide_path}`, 'info');
@@ -264,6 +295,19 @@ function toggleHistory() {
     } else {
         content.classList.add('collapsed');
         icon.classList.remove('expanded');
+    }
+}
+
+function toggleAlgorithm() {
+    const content = document.getElementById('algorithm-content');
+    const icon = document.getElementById('algorithm-icon');
+
+    if (content.classList.contains('collapsed')) {
+        content.classList.remove('collapsed');
+        icon.textContent = '▼';
+    } else {
+        content.classList.add('collapsed');
+        icon.textContent = '▶';
     }
 }
 
@@ -375,10 +419,21 @@ function closeInfoModal() {
     modal.classList.remove('active');
 }
 
+function openSettings() {
+    const modal = document.getElementById('settings-modal');
+    modal.classList.add('active');
+}
+
+function closeSettings() {
+    const modal = document.getElementById('settings-modal');
+    modal.classList.remove('active');
+}
+
 // Close modals on background click
 document.addEventListener('click', (e) => {
     const markdownModal = document.getElementById('markdown-modal');
     const infoModal = document.getElementById('info-modal');
+    const settingsModal = document.getElementById('settings-modal');
 
     if (e.target === markdownModal) {
         closeMarkdownModal();
@@ -386,6 +441,10 @@ document.addEventListener('click', (e) => {
 
     if (e.target === infoModal) {
         closeInfoModal();
+    }
+
+    if (e.target === settingsModal) {
+        closeSettings();
     }
 });
 
@@ -406,6 +465,7 @@ function setupEventListeners() {
         if (e.key === 'Escape') {
             closeMarkdownModal();
             closeInfoModal();
+            closeSettings();
         }
     });
 }
@@ -464,12 +524,14 @@ function openRefinedGuide() {
 }
 
 async function startRefinement() {
-    if (!currentJobId || !currentGuidePath) {
-        addLog('ERROR: No workflow to refine', 'error');
+    if (!currentJobId || !currentOutputDir) {
+        addLog('ERROR: No workflow to refine. Please complete a workflow first.', 'error');
+        console.error('[REFINE] Missing data:', {currentJobId, currentOutputDir});
         return;
     }
 
     addLog('\nStarting refinement...', 'info');
+    console.log('[REFINE] Sending refine request with:', {currentJobId, currentOutputDir});
 
     try {
         const response = await fetch('/api/refine', {
@@ -479,7 +541,7 @@ async function startRefinement() {
             },
             body: JSON.stringify({
                 job_id: currentJobId,
-                guide_path: currentGuidePath
+                output_dir: currentOutputDir
             })
         });
 
@@ -494,6 +556,247 @@ async function startRefinement() {
     } catch (error) {
         addLog(`ERROR: ${error.message}`, 'error');
     }
+}
+
+// =============================================================================
+// SETTINGS MANAGEMENT
+// =============================================================================
+
+// Simple encryption/obfuscation for localStorage (not cryptographically secure, but better than plaintext)
+function encodeKey(key) {
+    if (!key) return '';
+    // Base64 encode with simple XOR for obfuscation
+    const xorKey = 'FlowPlanner2025';
+    let encoded = '';
+    for (let i = 0; i < key.length; i++) {
+        encoded += String.fromCharCode(key.charCodeAt(i) ^ xorKey.charCodeAt(i % xorKey.length));
+    }
+    return btoa(encoded);
+}
+
+function decodeKey(encoded) {
+    if (!encoded) return '';
+    try {
+        const xorKey = 'FlowPlanner2025';
+        const decoded = atob(encoded);
+        let key = '';
+        for (let i = 0; i < decoded.length; i++) {
+            key += String.fromCharCode(decoded.charCodeAt(i) ^ xorKey.charCodeAt(i % xorKey.length));
+        }
+        return key;
+    } catch (e) {
+        console.error('[SETTINGS] Failed to decode key:', e);
+        return '';
+    }
+}
+
+// Save settings to localStorage
+function saveSettings(settings) {
+    try {
+        const encoded = {
+            gemini_key: encodeKey(settings.gemini_key),
+            anthropic_key: encodeKey(settings.anthropic_key),
+            gemini_model: settings.gemini_model,
+            claude_model: settings.claude_model
+        };
+        localStorage.setItem('flowplanner_settings', JSON.stringify(encoded));
+        console.log('[SETTINGS] Settings saved to localStorage');
+    } catch (e) {
+        console.error('[SETTINGS] Failed to save settings:', e);
+    }
+}
+
+// Load settings from localStorage
+function loadSettings() {
+    try {
+        const stored = localStorage.getItem('flowplanner_settings');
+        if (!stored) {
+            console.log('[SETTINGS] No saved settings found');
+            return null;
+        }
+
+        const encoded = JSON.parse(stored);
+        return {
+            gemini_key: decodeKey(encoded.gemini_key),
+            anthropic_key: decodeKey(encoded.anthropic_key),
+            gemini_model: encoded.gemini_model,
+            claude_model: encoded.claude_model
+        };
+    } catch (e) {
+        console.error('[SETTINGS] Failed to load settings:', e);
+        return null;
+    }
+}
+
+// Populate settings form with saved values
+function populateSettingsForm() {
+    const settings = loadSettings();
+    if (!settings) return;
+
+    console.log('[SETTINGS] Populating form with saved settings');
+
+    if (settings.gemini_key) {
+        document.getElementById('gemini-api-key').value = settings.gemini_key;
+    }
+
+    if (settings.anthropic_key) {
+        document.getElementById('anthropic-api-key').value = settings.anthropic_key;
+    }
+
+    if (settings.gemini_model) {
+        document.getElementById('gemini-model').value = settings.gemini_model;
+    }
+
+    if (settings.claude_model) {
+        document.getElementById('claude-model').value = settings.claude_model;
+    }
+}
+
+// Toggle password visibility
+function togglePasswordVisibility(fieldId) {
+    const field = document.getElementById(fieldId);
+    const button = field.nextElementSibling;
+    const icon = button.querySelector('.eye-icon');
+
+    if (field.type === 'password') {
+        field.type = 'text';
+        icon.textContent = '👁️‍🗨️';
+    } else {
+        field.type = 'password';
+        icon.textContent = '👁';
+    }
+}
+
+// Verify API keys
+async function verifyAPIKeys() {
+    const geminiKey = document.getElementById('gemini-api-key').value.trim();
+    const anthropicKey = document.getElementById('anthropic-api-key').value.trim();
+
+    if (!geminiKey && !anthropicKey) {
+        showApiStatus('Please enter at least one API key', 'error');
+        return;
+    }
+
+    showApiStatus('Verifying API keys...', 'info');
+
+    try {
+        const response = await fetch('/api/verify-keys', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                gemini_key: geminiKey,
+                anthropic_key: anthropicKey
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to verify keys');
+        }
+
+        // Display results
+        let messages = [];
+
+        if (geminiKey) {
+            if (data.gemini.valid) {
+                messages.push('✓ Gemini API key is valid');
+            } else {
+                messages.push(`✗ Gemini: ${data.gemini.error || 'Invalid key'}`);
+            }
+        }
+
+        if (anthropicKey) {
+            if (data.anthropic.valid) {
+                messages.push('✓ Anthropic API key is valid');
+            } else {
+                messages.push(`✗ Anthropic: ${data.anthropic.error || 'Invalid key'}`);
+            }
+        }
+
+        const allValid = (!geminiKey || data.gemini.valid) && (!anthropicKey || data.anthropic.valid);
+        showApiStatus(messages.join(' | '), allValid ? 'success' : 'error');
+
+    } catch (error) {
+        showApiStatus(`Error: ${error.message}`, 'error');
+    }
+}
+
+// Apply settings
+async function applySettings() {
+    const geminiKey = document.getElementById('gemini-api-key').value.trim();
+    const anthropicKey = document.getElementById('anthropic-api-key').value.trim();
+    const geminiModel = document.getElementById('gemini-model').value;
+    const claudeModel = document.getElementById('claude-model').value;
+
+    if (!geminiKey && !anthropicKey) {
+        showApiStatus('Please enter at least one API key', 'error');
+        return;
+    }
+
+    // Save to localStorage
+    const settings = {
+        gemini_key: geminiKey,
+        anthropic_key: anthropicKey,
+        gemini_model: geminiModel,
+        claude_model: claudeModel
+    };
+
+    saveSettings(settings);
+    showApiStatus('Settings saved successfully! They will be used in the next workflow.', 'success');
+
+    console.log('[SETTINGS] Applied settings:', {
+        gemini_model: geminiModel,
+        claude_model: claudeModel,
+        has_gemini_key: !!geminiKey,
+        has_anthropic_key: !!anthropicKey
+    });
+
+    // Close modal after a delay
+    setTimeout(() => {
+        closeSettings();
+    }, 2000);
+}
+
+// Show API status message
+function showApiStatus(message, type) {
+    const statusDiv = document.getElementById('api-status');
+    const statusText = document.getElementById('api-status-text');
+
+    statusDiv.className = `api-status ${type}`;
+    statusText.textContent = message;
+    statusDiv.classList.remove('hidden');
+
+    // Auto-hide after 5 seconds for success messages
+    if (type === 'success') {
+        setTimeout(() => {
+            statusDiv.classList.add('hidden');
+        }, 5000);
+    }
+}
+
+// Get current settings for API calls
+function getCurrentSettings() {
+    // First check if user has provided settings in the form
+    const geminiKey = document.getElementById('gemini-api-key')?.value?.trim();
+    const anthropicKey = document.getElementById('anthropic-api-key')?.value?.trim();
+    const geminiModel = document.getElementById('gemini-model')?.value;
+    const claudeModel = document.getElementById('claude-model')?.value;
+
+    // If form has values, use them
+    if (geminiKey || anthropicKey) {
+        return {
+            gemini_key: geminiKey,
+            anthropic_key: anthropicKey,
+            gemini_model: geminiModel,
+            claude_model: claudeModel
+        };
+    }
+
+    // Otherwise, load from localStorage
+    return loadSettings();
 }
 
 // =============================================================================

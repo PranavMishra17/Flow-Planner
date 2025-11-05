@@ -367,6 +367,14 @@ class StateCapturer:
                 logger.debug(f"[CAPTURE] Excluding step {step_num}: Internal error")
                 continue
 
+            # Exclude internal file operations (Browser-Use agent TODO tracking)
+            if any(keyword in description for keyword in [
+                'todo.md', 'local file', '.md file', 'update the local',
+                'mark navigation complete', 'mark task complete'
+            ]):
+                logger.debug(f"[CAPTURE] Excluding step {step_num}: Internal file operation")
+                continue
+
             # Exclude screenshot-only verification steps
             if 'requested screenshot' in description and len(action_list) == 1:
                 if any('screenshot' in str(a) for a in action_list):
@@ -608,13 +616,33 @@ class StateCapturer:
         logger.info(f"[CAPTURE] Validated screenshots for {len(states_with_validated_screenshots)} states")
 
         # Build prompt for Gemini with explicit screenshot rules
-        prompt = f"""You are creating an INSTRUCTION MANUAL for a future AI agent to execute this task.
+        prompt = f"""You are creating a DETAILED INSTRUCTION MANUAL for a future AI agent to execute this task.
 
 **CRITICAL PRINCIPLES:**
 1. This is NOT a history log of what happened - it's a RECIPE for how to do it
 2. Write in IMPERATIVE language: "Click the button" NOT "The agent clicked"
-3. Be CONCISE - only essential information
-4. Ensure ALL steps needed to COMPLETE the task are documented
+3. Be CONCISE - only essential information per step
+4. Create GRANULAR, INCREMENTAL steps - break down EVERY action into its own step
+5. Ensure ALL steps needed to COMPLETE the task are documented
+
+**STRICT EXCLUSIONS - DO NOT INCLUDE IN THE GUIDE:**
+- NO references to local files (todo.md, metadata.json, .md files, etc.)
+- NO file system operations (updating files, marking tasks complete in files, etc.)
+- NO implementation details about how the agent works internally
+- NO references to screenshots, metadata, or data files in the workflow steps
+- NO debugging or internal processing steps
+- ONLY include user-facing UI actions that happen in the web application
+
+**REMEMBER:** The future agent reading this guide will execute actions in a WEB BROWSER, not on the local file system.
+Every step must be a UI action: navigate, click, type, select, scroll, submit, verify.
+
+**GRANULAR STEP REQUIREMENT:**
+- Navigation to website = separate step
+- Login check/action = separate step
+- Each button click = separate step
+- Each text input = separate step
+- Each form submission/Enter key = separate step
+- Final verification/success state = separate step (if applicable)
 
 **Task to Complete**: {task_description}
 
@@ -644,19 +672,25 @@ Start with:
 
 ### 2. Complete Workflow Path
 
-Provide a numbered list showing the high-level journey:
+Provide a numbered list showing ALL incremental steps:
 ```markdown
 ### Complete Workflow Path
-1. Navigate to the application
-2. [High-level step, e.g., "Locate and click the Create button"]
-3. [High-level step, e.g., "Fill out the form"]
-4. [Continue until task is COMPLETED]
+1. Navigate to [application URL]
+2. [If authentication needed] Login or verify logged-in status
+3. [Action 1, e.g., "Click the Create button"]
+4. [Action 2, e.g., "Type task name in input field"]
+5. [Action 3, e.g., "Press Enter to submit"]
+6. [Continue with EVERY action until task is COMPLETED]
+7. [Final step] Verify task completion / Success state
 ```
 
-**CRITICAL**: Verify the last step COMPLETES the task from the original task description.
-- If task says "copy video link", ensure final step shows copying the link
-- If task says "create form", ensure final step shows form creation completed
-- DO NOT stop at intermediate steps
+**CRITICAL REQUIREMENTS:**
+- EVERY meaningful action must be a separate numbered step
+- Do NOT combine multiple actions into one step
+- Include navigation, authentication checks, each click, each input, submissions
+- Verify the last step COMPLETES the task from the original task description
+- If task says "create task in Asana", ensure you show: navigate→login→click create→input name→submit→verify
+- DO NOT create high-level summaries - be GRANULAR and INCREMENTAL
 
 ### 3. Detailed Workflow Steps
 
@@ -686,7 +720,7 @@ For each step, use this format:
 
 **Examples:**
 
-Good (action-focused):
+GOOD (action-focused, UI only):
 ```markdown
 ### Step 3: Click the Search Button
 
@@ -695,11 +729,27 @@ Good (action-focused):
 - **Screenshot**: ![Step 3](step_003.png)
 ```
 
-Bad (verbose, history-like):
+BAD (verbose, history-like):
 ```markdown
 ### Step 3: Search Button Interaction
 
 The agent then proceeded to click on the search button. What's happening: The page is showing the YouTube homepage with various UI elements. The search button is located in the navigation bar and clicking it will activate the search functionality.
+```
+
+BAD (contains local file references - NEVER DO THIS):
+```markdown
+### Step 4: Complete Workflow Path
+
+- **Action**: Update the local file todo.md to mark navigation complete
+- **URL**: `https://linear.app`
+```
+
+BAD (contains metadata/implementation details - NEVER DO THIS):
+```markdown
+### Step 5: Save Metadata
+
+- **Action**: Save workflow metadata to metadata.json
+- Update screenshot references in local files
 ```
 
 ---
@@ -739,11 +789,16 @@ Generate the complete guide following this exact structure:
 - **Key Actions**: [List main actions taken]
 ```
 
-**Final Verification:**
+**Final Verification Before Outputting:**
 - Does the last documented step COMPLETE the original task?
 - Are all steps written in imperative language?
 - Are screenshot references only where has_screenshot=true?
 - Is the authentication status clearly documented?
+- CRITICAL: Have you removed ALL references to local files (todo.md, metadata.json, etc.)?
+- CRITICAL: Have you removed ALL file system operations?
+- CRITICAL: Are ALL steps UI actions in the web browser ONLY?
+
+**REMEMBER:** This guide is for a future agent who will ONLY interact with the web UI, NOT with local files.
 
 Generate the guide now:"""
 
