@@ -147,11 +147,13 @@ Press Ctrl+C to stop
 """)
 
         # Run Flask app with SocketIO
+        # Use PORT from environment (Railway) or default to 5000
+        port = int(os.getenv('PORT', 5000))
         socketio.run(
             app,
             debug=Config.DEBUG,
             host='0.0.0.0',
-            port=5000,
+            port=port,
             allow_unsafe_werkzeug=True  # For development
         )
 

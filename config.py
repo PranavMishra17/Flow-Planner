@@ -11,9 +11,9 @@ load_dotenv()
 class Config:
     """Application configuration class"""
 
-    # API Keys
-    GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
-    ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY')
+    # API Keys (strip whitespace to prevent header errors)
+    GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '').strip() or None
+    ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY', '').strip() or None
 
     # Flask Configuration
     SECRET_KEY = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key-change-in-production')

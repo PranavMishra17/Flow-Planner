@@ -140,7 +140,12 @@ class TestAPIConnectivity:
         import anthropic
 
         try:
-            client = anthropic.Anthropic(api_key=Config.ANTHROPIC_API_KEY)
+            # Strip whitespace/newlines from API key
+            api_key = Config.ANTHROPIC_API_KEY.strip() if Config.ANTHROPIC_API_KEY else None
+            if not api_key:
+                pytest.skip("ANTHROPIC_API_KEY not set")
+
+            client = anthropic.Anthropic(api_key=api_key)
 
             # Send a simple test message
             message = await asyncio.to_thread(
