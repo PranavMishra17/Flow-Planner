@@ -25,6 +25,18 @@ def health_check():
     }), 200
 
 
+@workflows_bp.route('/config', methods=['GET'])
+def get_config():
+    """
+    Get frontend configuration settings
+    """
+    from config import Config
+    return jsonify({
+        'headless_browser': Config.HEADLESS_BROWSER,
+        'use_browser_storage': Config.HEADLESS_BROWSER  # If headless (Railway), use browser storage
+    }), 200
+
+
 @workflows_bp.route('/workflow', methods=['POST'])
 def create_workflow():
     """
@@ -95,6 +107,71 @@ def get_workflow_status_route(job_id):
 
     except Exception as e:
         logger.error(f"[API] Failed to get job status: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@workflows_bp.route('/workflow/<job_id>/guide', methods=['GET'])
+def get_workflow_guide(job_id):
+    """Get workflow guide content"""
+    import os
+    try:
+        job_info = active_jobs.get(job_id)
+        if not job_info:
+            return jsonify({'error': 'Job not found'}), 404
+
+        guide_type = request.args.get('type', 'guide')  # 'guide' or 'refined'
+
+        if guide_type == 'refined' and job_info.get('refined_guide_path'):
+            guide_path = job_info['refined_guide_path']
+        elif job_info.get('guide_path'):
+            guide_path = job_info['guide_path']
+        else:
+            return jsonify({'error': 'Guide not found'}), 404
+
+        if not os.path.exists(guide_path):
+            return jsonify({'error': f'Guide file not found at {guide_path}'}), 404
+
+        with open(guide_path, 'r', encoding='utf-8') as f:
+            guide_content = f.read()
+
+        return jsonify({
+            'guide_content': guide_content,
+            'guide_path': os.path.basename(guide_path)
+        })
+
+    except Exception as e:
+        logger.error(f"[API] Failed to get guide: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@workflows_bp.route('/workflow/<job_id>/metadata', methods=['GET'])
+def get_workflow_metadata(job_id):
+    """Get workflow metadata content"""
+    import os
+    import json
+    try:
+        job_info = active_jobs.get(job_id)
+        if not job_info:
+            return jsonify({'error': 'Job not found'}), 404
+
+        output_dir = job_info.get('output_dir')
+        if not output_dir:
+            return jsonify({'error': 'Output directory not found'}), 404
+
+        metadata_path = os.path.join(output_dir, 'metadata.json')
+        if not os.path.exists(metadata_path):
+            return jsonify({'error': f'Metadata file not found at {metadata_path}'}), 404
+
+        with open(metadata_path, 'r', encoding='utf-8') as f:
+            metadata_content = json.load(f)
+
+        return jsonify({
+            'metadata': metadata_content,
+            'metadata_path': metadata_path
+        })
+
+    except Exception as e:
+        logger.error(f"[API] Failed to get metadata: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 

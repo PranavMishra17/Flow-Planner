@@ -5,6 +5,7 @@ Real-time workflow capture with SocketIO streaming
 import os
 import sys
 import logging
+from datetime import datetime
 from flask import Flask, render_template, jsonify, send_from_directory
 from flask_socketio import SocketIO
 from flask_cors import CORS
@@ -76,11 +77,19 @@ def get_history():
                 except:
                     pass
 
+            # Get creation time for sorting
+            try:
+                dir_stat = os.stat(run_path)
+                timestamp = datetime.fromtimestamp(dir_stat.st_ctime).isoformat()
+            except:
+                timestamp = None
+
             runs.append({
                 'id': run_dir,
                 'name': task_name,
                 'markdown_files': md_files,
-                'path': run_dir
+                'path': run_dir,
+                'timestamp': timestamp
             })
 
         return jsonify({'runs': runs})

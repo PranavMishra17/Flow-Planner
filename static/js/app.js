@@ -10,9 +10,95 @@ let isRunning = false;
 let currentGuidePath = null;
 let currentRefinedGuidePath = null;
 let currentOutputDir = null;
+let useBrowserStorage = false;  // Set based on config
+let currentMarkdownContent = null;  // Store current markdown content for download
+let currentMarkdownFilename = null;  // Store current markdown filename
+
+// =============================================================================
+// STORAGE MANAGER - Abstracts localStorage vs file system
+// =============================================================================
+
+const StorageManager = {
+    HISTORY_KEY: 'flow_planner_history',
+    WORKFLOW_KEY_PREFIX: 'flow_planner_workflow_',
+
+    // Save workflow data to localStorage
+    saveWorkflow(jobId, data) {
+        const key = this.WORKFLOW_KEY_PREFIX + jobId;
+        localStorage.setItem(key, JSON.stringify(data));
+        console.log('[STORAGE] Saved workflow to localStorage:', jobId);
+    },
+
+    // Get workflow data from localStorage
+    getWorkflow(jobId) {
+        const key = this.WORKFLOW_KEY_PREFIX + jobId;
+        const data = localStorage.getItem(key);
+        return data ? JSON.parse(data) : null;
+    },
+
+    // Save to history
+    addToHistory(historyItem) {
+        let history = this.getHistory();
+        // Add new item at the beginning
+        history.unshift(historyItem);
+        // Keep only last 50 items
+        history = history.slice(0, 50);
+        localStorage.setItem(this.HISTORY_KEY, JSON.stringify(history));
+        console.log('[STORAGE] Added to history:', historyItem.job_id);
+    },
+
+    // Get history (sorted by timestamp, newest first)
+    getHistory() {
+        const data = localStorage.getItem(this.HISTORY_KEY);
+        if (!data) return [];
+        const history = JSON.parse(data);
+        // Sort by timestamp descending (newest first)
+        return history.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    },
+
+    // Delete workflow from history and storage
+    deleteWorkflow(jobId) {
+        // Remove from history
+        let history = this.getHistory();
+        history = history.filter(item => item.job_id !== jobId);
+        localStorage.setItem(this.HISTORY_KEY, JSON.stringify(history));
+
+        // Remove workflow data
+        const key = this.WORKFLOW_KEY_PREFIX + jobId;
+        localStorage.removeItem(key);
+
+        console.log('[STORAGE] Deleted workflow:', jobId);
+    },
+
+    // Clear all data
+    clearAll() {
+        const keys = Object.keys(localStorage);
+        keys.forEach(key => {
+            if (key.startsWith('flow_planner_')) {
+                localStorage.removeItem(key);
+            }
+        });
+        console.log('[STORAGE] Cleared all workflow data');
+    }
+};
+
+// Load configuration from backend
+async function loadConfig() {
+    try {
+        const response = await fetch('/api/config');
+        const config = await response.json();
+        useBrowserStorage = config.use_browser_storage;
+        console.log('[CONFIG] Storage mode:', useBrowserStorage ? 'Browser localStorage' : 'File system');
+    } catch (error) {
+        console.error('[CONFIG] Failed to load config:', error);
+        // Default to file system mode
+        useBrowserStorage = false;
+    }
+}
 
 // Initialize on page load
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadConfig();  // Load config first to determine storage mode
     initializeSocketIO();
     loadHistory();
     setupEventListeners();
@@ -228,13 +314,19 @@ function handleStatusUpdate(data) {
             addLog(`Guide: ${data.guide_path}`, 'info');
             console.log('[STATUS] Guide path:', data.guide_path);
 
-            // Store guide path
-            currentGuidePath = `${data.output_dir}/${data.guide_path}`;
+            // Store guide path - construct relative path for viewMarkdown() (runN/guide.md)
+            const folderName = data.output_dir.split(/[/\\]/).pop();
+            currentGuidePath = `${folderName}/${data.guide_path}`;
             console.log('[STATUS] Current guide path set to:', currentGuidePath);
+
+            // If using browser storage, fetch and save content
+            if (useBrowserStorage) {
+                saveWorkflowToBrowserStorage(job_id, data);
+            }
 
             // Check if we also have a refined guide
             if (data.refined_guide_path) {
-                currentRefinedGuidePath = `${data.output_dir}/${data.refined_guide_path}`;
+                currentRefinedGuidePath = `${folderName}/${data.refined_guide_path}`;
                 addLog(`Refined guide: ${data.refined_guide_path}`, 'info');
                 console.log('[STATUS] Showing buttons with refined guide');
                 showActionButtons(true, true); // Show all buttons including refined
@@ -256,8 +348,37 @@ function handleStatusUpdate(data) {
         resetUI();
 
     } else if (status === 'refining') {
-        // Hide refine button when refinement starts
-        document.getElementById('refine-btn').classList.add('hidden');
+        // Disable and hide refine button when refinement starts
+        const refineBtn = document.getElementById('refine-btn');
+        refineBtn.disabled = true;
+        refineBtn.classList.add('hidden');
+
+    } else if (status === 'refined') {
+        // Refinement completed successfully
+        addLog('\n' + '='.repeat(80), 'success');
+        addLog('REFINEMENT COMPLETED!', 'success');
+        addLog('='.repeat(80), 'success');
+
+        // Update refined guide path
+        if (data.refined_guide_path) {
+            // Construct relative path for viewMarkdown() (runN/refined_guide.md)
+            const folderName = currentOutputDir.split(/[/\\]/).pop();
+            currentRefinedGuidePath = `${folderName}/${data.refined_guide_path}`;
+
+            // If using browser storage, update stored workflow with refined guide
+            if (useBrowserStorage && currentJobId) {
+                updateRefinedGuideInStorage(currentJobId);
+            }
+
+            // Show guide and refined guide buttons, but keep refine button hidden (refinement already done)
+            showActionButtons(true, true);
+            document.getElementById('refine-btn').classList.add('hidden');
+        }
+
+    } else if (status === 'refinement_failed') {
+        addLog('\n' + '='.repeat(80), 'error');
+        addLog(`REFINEMENT FAILED: ${data.error}`, 'error');
+        addLog('='.repeat(80), 'error');
 
     } else {
         // Status change (planning, executing, etc.)
@@ -315,37 +436,104 @@ async function loadHistory() {
     const historyList = document.getElementById('history-list');
 
     try {
-        const response = await fetch('/api/history');
-        const data = await response.json();
+        let runs = [];
 
-        if (!data.runs || data.runs.length === 0) {
+        if (useBrowserStorage) {
+            // Load from localStorage
+            const history = StorageManager.getHistory();
+            runs = history.map(item => ({
+                name: item.task || item.job_id,
+                job_id: item.job_id,
+                timestamp: item.timestamp,
+                has_guide: item.has_guide,
+                has_refined_guide: item.has_refined_guide,
+                output_dir: item.output_dir
+            }));
+            console.log('[HISTORY] Loaded from localStorage:', runs.length, 'items');
+        } else {
+            // Load from file system via API
+            const response = await fetch('/api/history');
+            const data = await response.json();
+            runs = data.runs || [];
+            console.log('[HISTORY] Loaded from file system:', runs.length, 'items');
+        }
+
+        if (runs.length === 0) {
             historyList.innerHTML = '<div style="color: #888;">No workflow runs yet</div>';
             return;
         }
 
+        // Sort by timestamp descending (newest first) - for file system runs too
+        runs.sort((a, b) => {
+            const timeA = new Date(a.timestamp || 0).getTime();
+            const timeB = new Date(b.timestamp || 0).getTime();
+            return timeB - timeA;
+        });
+
         // Build history list
         historyList.innerHTML = '';
 
-        data.runs.forEach(run => {
+        runs.forEach(run => {
             const item = document.createElement('div');
             item.className = 'history-item';
+
+            const header = document.createElement('div');
+            header.style.display = 'flex';
+            header.style.justifyContent = 'space-between';
+            header.style.alignItems = 'center';
 
             const name = document.createElement('div');
             name.className = 'history-item-name';
             name.textContent = run.name;
 
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'history-delete-btn';
+            deleteBtn.innerHTML = '🗑';
+            deleteBtn.title = 'Delete workflow';
+            deleteBtn.style.cssText = 'padding: 2px 2px; font-size: 15px; background: #8B4513; color: white; border: 1px solid #654321; border-radius: 3px; cursor: pointer; transition: all 0.2s;';
+            deleteBtn.onmouseover = () => deleteBtn.style.background = '#A0522D';
+            deleteBtn.onmouseout = () => deleteBtn.style.background = '#97370a';
+            deleteBtn.onclick = (e) => {
+                e.stopPropagation();
+                if (confirm(`Delete workflow "${run.name}"?`)) {
+                    deleteHistoryItem(run.job_id);
+                }
+            };
+
+            header.appendChild(name);
+            header.appendChild(deleteBtn);
+
             const files = document.createElement('div');
             files.className = 'history-item-files';
 
-            run.markdown_files.forEach(file => {
-                const btn = document.createElement('button');
-                btn.className = 'history-file-btn';
-                btn.textContent = `📄 ${file}`;
-                btn.onclick = () => viewMarkdown(`${run.path}/${file}`);
-                files.appendChild(btn);
-            });
+            if (useBrowserStorage) {
+                // Browser storage: load from localStorage
+                if (run.has_guide) {
+                    const guideBtn = document.createElement('button');
+                    guideBtn.className = 'history-file-btn';
+                    guideBtn.textContent = 'View Guide';
+                    guideBtn.onclick = () => viewStoredGuide(run.job_id, 'guide');
+                    files.appendChild(guideBtn);
+                }
+                if (run.has_refined_guide) {
+                    const refinedBtn = document.createElement('button');
+                    refinedBtn.className = 'history-file-btn';
+                    refinedBtn.textContent = 'View Refined Guide';
+                    refinedBtn.onclick = () => viewStoredGuide(run.job_id, 'refined');
+                    files.appendChild(refinedBtn);
+                }
+            } else {
+                // File system: load from server
+                run.markdown_files.forEach(file => {
+                    const btn = document.createElement('button');
+                    btn.className = 'history-file-btn';
+                    btn.textContent = file;
+                    btn.onclick = () => viewMarkdown(`${run.path}/${file}`);
+                    files.appendChild(btn);
+                });
+            }
 
-            item.appendChild(name);
+            item.appendChild(header);
             item.appendChild(files);
             historyList.appendChild(item);
         });
@@ -353,6 +541,152 @@ async function loadHistory() {
     } catch (error) {
         console.error('[HISTORY] Failed to load:', error);
         historyList.innerHTML = '<div style="color: #ff0055;">Failed to load history</div>';
+    }
+}
+
+// Delete history item
+function deleteHistoryItem(jobId) {
+    if (useBrowserStorage) {
+        StorageManager.deleteWorkflow(jobId);
+    } else {
+        // For file system, would need a backend delete endpoint
+        // For now just show message
+        alert('File system deletion not implemented. Files remain in output folder.');
+    }
+    loadHistory();  // Refresh history
+}
+
+// View guide from localStorage
+async function viewStoredGuide(jobId, type) {
+    const workflow = StorageManager.getWorkflow(jobId);
+    if (!workflow) {
+        alert('Workflow data not found in storage');
+        return;
+    }
+
+    const guideContent = type === 'refined' ? workflow.refined_guide : workflow.guide;
+    if (!guideContent) {
+        alert(`${type === 'refined' ? 'Refined guide' : 'Guide'} not found`);
+        return;
+    }
+
+    // Store for download
+    currentMarkdownContent = guideContent;
+    currentMarkdownFilename = type === 'refined' ? 'WORKFLOW_GUIDE_REFINED.md' : 'WORKFLOW_GUIDE.md';
+
+    // Show in modal
+    const modal = document.getElementById('markdown-modal');
+    const viewer = document.getElementById('markdown-viewer');
+    const title = document.getElementById('modal-title');
+
+    try {
+        // Convert markdown to HTML using marked
+        let htmlContent = marked.parse(guideContent);
+
+        // Fix image paths (make them absolute) - extract folder name from output_dir
+        if (workflow.output_dir) {
+            const folderName = workflow.output_dir.split(/[/\\]/).pop();
+            htmlContent = htmlContent.replace(
+                /src="(?!http)(.*?)"/g,
+                (_, path) => `src="/output/${folderName}/${path}"`
+            );
+        }
+
+        viewer.innerHTML = htmlContent;
+        title.textContent = type === 'refined' ? 'REFINED WORKFLOW GUIDE' : 'WORKFLOW GUIDE';
+        modal.classList.add('active');
+    } catch (error) {
+        console.error('[VIEWER] Failed to render markdown:', error);
+        alert('Failed to render guide');
+    }
+}
+
+// Save workflow to browser storage (fetch guide and metadata from backend)
+async function saveWorkflowToBrowserStorage(jobId, statusData) {
+    try {
+        console.log('[STORAGE] Fetching workflow data for storage:', jobId);
+
+        // Fetch guide content
+        const guideResponse = await fetch(`/api/workflow/${jobId}/guide`);
+        const guideData = await guideResponse.json();
+
+        // Fetch metadata
+        const metadataResponse = await fetch(`/api/workflow/${jobId}/metadata`);
+        const metadataData = await metadataResponse.json();
+
+        // Fetch refined guide if available
+        let refinedGuide = null;
+        if (statusData.refined_guide_path) {
+            const refinedResponse = await fetch(`/api/workflow/${jobId}/guide?type=refined`);
+            const refinedData = await refinedResponse.json();
+            refinedGuide = refinedData.guide_content;
+        }
+
+        // Save to localStorage
+        const workflowData = {
+            job_id: jobId,
+            guide: guideData.guide_content,
+            refined_guide: refinedGuide,
+            metadata: metadataData.metadata,
+            output_dir: statusData.output_dir
+        };
+
+        StorageManager.saveWorkflow(jobId, workflowData);
+
+        // Add to history
+        const historyItem = {
+            job_id: jobId,
+            task: metadataData.metadata.task?.description || jobId,
+            timestamp: new Date().toISOString(),
+            has_guide: true,
+            has_refined_guide: !!refinedGuide,
+            output_dir: statusData.output_dir
+        };
+
+        StorageManager.addToHistory(historyItem);
+
+        console.log('[STORAGE] Workflow saved to browser storage');
+
+    } catch (error) {
+        console.error('[STORAGE] Failed to save workflow:', error);
+        addLog('Warning: Failed to save to browser storage', 'warning');
+    }
+}
+
+// Update refined guide in storage after refinement completes
+async function updateRefinedGuideInStorage(jobId) {
+    try {
+        console.log('[STORAGE] Updating refined guide in storage:', jobId);
+
+        // Fetch refined guide
+        const refinedResponse = await fetch(`/api/workflow/${jobId}/guide?type=refined`);
+        const refinedData = await refinedResponse.json();
+
+        // Get existing workflow data
+        const workflowData = StorageManager.getWorkflow(jobId);
+        if (!workflowData) {
+            console.error('[STORAGE] Workflow not found:', jobId);
+            return;
+        }
+
+        // Update refined guide
+        workflowData.refined_guide = refinedData.guide_content;
+        StorageManager.saveWorkflow(jobId, workflowData);
+
+        // Update history item
+        let history = StorageManager.getHistory();
+        const historyItem = history.find(item => item.job_id === jobId);
+        if (historyItem) {
+            historyItem.has_refined_guide = true;
+            localStorage.setItem(StorageManager.HISTORY_KEY, JSON.stringify(history));
+        }
+
+        console.log('[STORAGE] Refined guide updated in storage');
+        loadHistory();  // Refresh history display
+
+    } catch (error) {
+        console.error('[STORAGE] Failed to update refined guide:', error);
+        addLog('Warning: Failed to save refined guide to storage', 'warning');
     }
 }
 
@@ -379,6 +713,10 @@ async function viewMarkdown(filepath) {
             throw new Error(data.error || 'Failed to load markdown');
         }
 
+        // Store for download
+        currentMarkdownContent = data.content;
+        currentMarkdownFilename = filepath.split('/').pop();
+
         // Convert markdown to HTML
         const htmlContent = marked.parse(data.content);
 
@@ -394,7 +732,7 @@ async function viewMarkdown(filepath) {
 
         // Render
         viewer.innerHTML = fixedHtml;
-        title.textContent = filepath.split('/').pop().replace('.md', '');
+        title.textContent = filepath.split('/').pop().replace('.md', '').replace(/_/g, ' ').toUpperCase();
 
     } catch (error) {
         console.error('[MARKDOWN] Failed to load:', error);
@@ -406,6 +744,30 @@ async function viewMarkdown(filepath) {
 function closeMarkdownModal() {
     const modal = document.getElementById('markdown-modal');
     modal.classList.remove('active');
+}
+
+function downloadCurrentGuide() {
+    if (!currentMarkdownContent || !currentMarkdownFilename) {
+        alert('No guide content to download');
+        return;
+    }
+
+    // Create a blob with the markdown content
+    const blob = new Blob([currentMarkdownContent], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+
+    // Create a temporary link and trigger download
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = currentMarkdownFilename;
+    document.body.appendChild(a);
+    a.click();
+
+    // Cleanup
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    console.log('[DOWNLOAD] Downloaded guide:', currentMarkdownFilename);
 }
 
 // Info Modal Functions
@@ -512,13 +874,21 @@ function hideActionButtons() {
 }
 
 function openGuide() {
-    if (currentGuidePath) {
+    if (useBrowserStorage && currentJobId) {
+        // Load from localStorage
+        viewStoredGuide(currentJobId, 'guide');
+    } else if (currentGuidePath) {
+        // Load from file system
         viewMarkdown(currentGuidePath);
     }
 }
 
 function openRefinedGuide() {
-    if (currentRefinedGuidePath) {
+    if (useBrowserStorage && currentJobId) {
+        // Load from localStorage
+        viewStoredGuide(currentJobId, 'refined');
+    } else if (currentRefinedGuidePath) {
+        // Load from file system
         viewMarkdown(currentRefinedGuidePath);
     }
 }

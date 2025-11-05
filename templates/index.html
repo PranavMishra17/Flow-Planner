@@ -154,7 +154,10 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="modal-title" class="section-title">WORKFLOW GUIDE</h2>
-                <button class="close-btn" onclick="closeMarkdownModal()">✕</button>
+                <div style="display: flex; gap: 8px;">
+                    <button id="download-guide-btn" class="close-btn" onclick="downloadCurrentGuide()" style="background: var(--accent-purple); border-color: var(--accent-purple);">⬇ Download</button>
+                    <button class="close-btn" onclick="closeMarkdownModal()">✕</button>
+                </div>
             </div>
             <div id="markdown-viewer" class="markdown-viewer">
                 <!-- Rendered markdown will appear here -->
@@ -336,6 +339,36 @@
                         <div class="cost-row">
                             <span class="cost-label">Typical Workflow:</span>
                             <span class="cost-value">$0.02-0.10 total</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h3 class="settings-section-title">PRIVACY & STORAGE</h3>
+                    <div class="privacy-info">
+                        <div class="privacy-item">
+                            <div class="privacy-icon">🔐</div>
+                            <div class="privacy-text">
+                                <strong>API Keys</strong>
+                                <span>Encrypted (XOR + Base64) and stored locally in your browser. Never sent to our servers for storage.</span>
+                            </div>
+                        </div>
+                        <div class="privacy-item">
+                            <div class="privacy-icon">💾</div>
+                            <div class="privacy-text">
+                                <strong>Workflow History</strong>
+                                <span>Stored in your browser's localStorage. Persists across sessions but stays on your device only.</span>
+                            </div>
+                        </div>
+                        <div class="privacy-item">
+                            <div class="privacy-icon">🔒</div>
+                            <div class="privacy-text">
+                                <strong>Privacy-First</strong>
+                                <span>Your keys are only used to make direct API calls to Google and Anthropic. We never store or log your credentials.</span>
+                            </div>
+                        </div>
+                        <div class="privacy-note">
+                            Note: On Railway deployment, workflows and guides are stored in browser storage for your convenience. Clear browser data to remove all stored information.
                         </div>
                     </div>
                 </div>

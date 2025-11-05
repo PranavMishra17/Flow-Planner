@@ -440,11 +440,11 @@ body::before {
 
 .settings-btn {
     background-color: transparent;
-    border: 2px solid white;
+    border: 2px solid transparent;
     color: white;
-    font-size: 16px;
-    width: 32px;
-    height: 32px;
+    font-size: 20px;
+    width: 44px;
+    height: 44px;
     cursor: pointer;
     border-radius: 4px;
     transition: all 0.3s;
@@ -456,6 +456,7 @@ body::before {
 
 .settings-btn:hover {
     background-color: rgba(255, 255, 255, 0.1);
+    border: 2px solid white;
     transform: rotate(30deg);
 }
 
@@ -1261,6 +1262,63 @@ body::before {
 .cost-value {
     color: var(--accent-orange);
     font-weight: bold;
+}
+
+/* Privacy & Storage Section */
+.privacy-info {
+    padding: var(--spacing-sm);
+}
+
+.privacy-item {
+    display: flex;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.privacy-item:last-of-type {
+    border-bottom: none;
+}
+
+.privacy-icon {
+    font-size: 20px;
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.privacy-text {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+}
+
+.privacy-text strong {
+    color: var(--text-primary);
+    font-size: 8px;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+}
+
+.privacy-text span {
+    color: var(--text-secondary);
+    font-size: 7px;
+    line-height: 1.4;
+}
+
+.privacy-note {
+    margin-top: 12px;
+    padding: 10px;
+    background: rgba(157, 78, 221, 0.1);
+    border: 1px solid var(--accent-purple);
+    border-radius: 4px;
+    color: var(--text-secondary);
+    font-size: 7px;
+    line-height: 1.4;
 }
 
 .settings-actions {
