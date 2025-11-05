@@ -8,8 +8,8 @@
 <div align="center">
   
   [![Browser-Use](https://img.shields.io/badge/Powered%20by-Browser--Use-blue?style=for-the-badge&logo=github)](https://github.com/browser-use/browser-use)
-  [![Website](https://img.shields.io/badge/Website-browser--use.com-green?style=for-the-badge&logo=google-chrome)](https://browser-use.com)
-  [![Demo](https://img.shields.io/badge/Demo-Live-orange?style=for-the-badge&logo=youtube)](https://your-demo-link.com)
+  [![Website](https://img.shields.io/badge/Website-browser--use.com-green?style=for-the-badge&logo=google-chrome)](https://flow-planner-production.up.railway.app)
+  [![Demo](https://img.shields.io/badge/Demo-Live-orange?style=for-the-badge&logo=youtube)](https://www.youtube.com/@parano1dgames)
   [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
   
 </div>
