@@ -321,7 +321,7 @@ function handleStatusUpdate(data) {
 
             // If using browser storage, fetch and save content
             if (useBrowserStorage) {
-                saveWorkflowToBrowserStorage(job_id, data);
+                saveWorkflowToBrowserStorage(currentJobId, data);
             }
 
             // Check if we also have a refined guide
