@@ -490,6 +490,7 @@ body::before {
     color: var(--text-primary);
     font-family: 'Press Start 2P', cursive;
     font-size: 9px;
+    line-height: 2.2;
     padding: var(--spacing-sm);
     border-radius: 4px;
     resize: vertical;

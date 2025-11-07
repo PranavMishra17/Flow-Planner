@@ -9,7 +9,6 @@ import base64
 from datetime import datetime
 from typing import Dict, List, Optional
 from PIL import Image
-import io
 import google.generativeai as genai
 from config import Config
 
@@ -533,27 +532,29 @@ class StateCapturer:
             logger.debug(f"[CAPTURE] Step {step_num}: Screenshot path: {screenshot_path}")
 
             # Determine if this step SHOULD have a screenshot
-            needs_screenshot = False
+            # Default to True if screenshot exists (be lenient - include what browser-use captured)
+            needs_screenshot = bool(screenshot_path)
 
-            # Check for UI interactions that warrant screenshots
-            for action_item in action_list:
-                logger.debug(f"[CAPTURE] Step {step_num}: Checking action_item: {action_item}")
-                if any(key in action_item for key in ['click', 'input_text', 'input']):
-                    needs_screenshot = True
-                    logger.debug(f"[CAPTURE] Step {step_num}: Found UI interaction - needs screenshot")
-                    break
+            logger.debug(f"[CAPTURE] Step {step_num}: Initial needs_screenshot = {needs_screenshot} (based on existence)")
 
-            logger.debug(f"[CAPTURE] Step {step_num}: After UI check, needs_screenshot = {needs_screenshot}")
+            # Only exclude specific cases we definitely don't want
 
-            # EXCLUDE screenshots for navigation and wait steps
-            if 'navigate to url' in description or 'waited for' in description:
+            # Exclude initial navigation to URL (step 1)
+            if 'navigate to url' in description and step_num == 1:
                 needs_screenshot = False
-                logger.debug(f"[CAPTURE] Step {step_num}: Navigation/wait - no screenshot needed")
+                logger.debug(f"[CAPTURE] Step {step_num}: Initial navigation - excluding screenshot")
 
-            # EXCLUDE screenshots for done actions - check for actual done action, not 'is_done'
-            if any('done' in action_item for action_item in action_list):
+            # Exclude wait steps
+            elif 'waited for' in description:
                 needs_screenshot = False
-                logger.debug(f"[CAPTURE] Step {step_num}: Done action - no screenshot needed")
+                logger.debug(f"[CAPTURE] Step {step_num}: Wait step - excluding screenshot")
+
+            # Exclude done actions - check for actual done action, not 'is_done'
+            elif any('done' in action_item for action_item in action_list):
+                needs_screenshot = False
+                logger.debug(f"[CAPTURE] Step {step_num}: Done action - excluding screenshot")
+
+            # Keep everything else if browser-use captured it
 
             logger.debug(f"[CAPTURE] Step {step_num}: Final needs_screenshot = {needs_screenshot}")
 
@@ -710,13 +711,14 @@ For each step, use this format:
 - Keep it ONE sentence when possible
 - NO verbose explanations or "What's Happening" sections
 
-**Screenshot Rules - STRICT ENFORCEMENT:**
-- ONLY add `![Step X](path)` if state has `"has_screenshot": true`
-- ONLY use EXACT value from `"screenshot_path"` field
-- Navigation steps: NO screenshot
-- Wait/loading steps: NO screenshot
-- Done actions: NO screenshot
+**Screenshot Rules:**
+- Add `![Step X](path)` if state has `"has_screenshot": true`
+- Always use EXACT value from `"screenshot_path"` field
+- Generally exclude navigation steps unless they show important UI context
+- Wait/loading steps: typically no screenshot
+- Done actions: no screenshot needed
 - If `"has_screenshot": false` or missing: NO screenshot line at all
+- Prioritize screenshots for user interactions (clicks, inputs, form submissions)
 
 **Examples:**
 
