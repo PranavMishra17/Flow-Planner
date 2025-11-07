@@ -163,7 +163,8 @@ Press Ctrl+C to stop
             debug=Config.DEBUG,
             host='0.0.0.0',
             port=port,
-            allow_unsafe_werkzeug=True  # For development
+            allow_unsafe_werkzeug=True,  # For development
+            use_reloader=False  # Disable auto-reload to prevent mid-workflow restarts
         )
 
     except Exception as e:

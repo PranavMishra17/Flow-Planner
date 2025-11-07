@@ -121,8 +121,7 @@ def check_agent_files():
         'agent/state_capturer.py',
         'agent/authenticator.py',
         'config.py',
-        'test_browser_use.py',
-        'BROWSER_USE_IMPLEMENTATION.md'
+        'test_browser_use.py'
     ]
 
     all_exist = True
